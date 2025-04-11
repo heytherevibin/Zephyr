@@ -1,36 +1,169 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zephyr Chat Widget
+
+A modern, customizable chat widget built with Next.js and React, designed to be easily integrated into any web application.
+
+![Zephyr Chat Widget](https://via.placeholder.com/600x400?text=Zephyr+Chat+Widget)
+
+## Features
+
+- 💬 Real-time messaging interface
+- 📎 File attachments (images, videos, documents)
+- 🎙️ Voice message recording and playback
+- 😊 Emoji picker
+- 📱 Responsive design for all device sizes (mobile, tablet, desktop)
+- 🎨 Customizable styling with Tailwind CSS
+- 🔄 Automatic scrolling to newest messages
+- 💾 Chat transcript download
+- 🔄 Message history management
+- ✨ Smooth animations and transitions
+- 📱 Full-screen mode on mobile devices
+- 🎛️ Adaptive layout based on viewport size
+
+## Recent Enhancements (April 2025)
+
+- **Improved Responsive Design**: Full compatibility across mobile, tablet, and desktop with adaptive layouts and optimized spacing
+- **Consistent Button Sizing**: Both chat and close buttons maintain exactly 48x48px dimensions for visual consistency
+- **Enhanced Animations**: Smooth hover animations with fast response times for improved user interaction
+- **Fixed Animation Issues**: Resolved stuttering in button animations during transitions
+- **Better Mobile Experience**: Optimized text sizes, spacing, and element dimensions for mobile users
+- **Improved Positioning**: Fixed issues with button positioning and overlaps during transitions
+
+## Tech Stack
+
+- [Next.js](https://nextjs.org/) - React framework
+- [React](https://reactjs.org/) - UI library
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [Framer Motion](https://www.framer.com/motion/) - Animations
+- [Lucide React](https://lucide.dev/) - Icons
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18 or higher
+- npm or yarn package manager
+
+### Installation
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/yourusername/zephyr-chat-widget.git
+cd zephyr-chat-widget
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Run the development server:
 
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Usage
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Basic Implementation
 
-## Learn More
+Import and use the ChatWidget component in your application:
 
-To learn more about Next.js, take a look at the following resources:
+```jsx
+import { ChatWidget } from '../src/components/ChatWidget';
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+function MyApp() {
+  return (
+    <div>
+      <h1>My Website</h1>
+      {/* The ChatWidget will appear as a floating button in the bottom-right corner by default */}
+      <ChatWidget />
+    </div>
+  );
+}
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+export default MyApp;
+```
 
-## Deploy on Vercel
+### Customization
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The ChatWidget can be customized with props to match your application's needs:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```jsx
+<ChatWidget 
+  // Position in the page (bottom-right, bottom-left, top-right, top-left)
+  position="bottom-right"
+  // Distance from the edge of the screen in pixels
+  offset={20}
+  // Text shown in the chat header
+  headerText="Customer Support"
+  // Enable sound effects for new messages
+  soundEnabled={true}
+  // Callback functions for various events
+  onMessageSend={(msg) => console.log("Message sent:", msg)}
+  onOpen={() => console.log("Chat opened")}
+  onClose={() => console.log("Chat closed")}
+/>
+```
+
+## Responsive Behavior
+
+The ChatWidget automatically adapts to different screen sizes:
+
+- **Mobile**: Full-screen experience with optimized controls
+- **Tablet**: Large but not full-screen with appropriate spacing
+- **Desktop**: Standard fixed-size widget with all features
+
+## Button Animations
+
+The widget buttons feature smooth hover animations using Framer Motion:
+
+- Scale up to 110% on hover
+- Enhanced shadow effect for better depth perception
+- Quick response time for improved user experience
+
+## Deployment
+
+The chat widget can be deployed using Vercel, Netlify, or any other Next.js compatible hosting service.
+
+```bash
+# Build for production
+npm run build
+# or
+yarn build
+
+# Start production server
+npm start
+# or
+yarn start
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Icons provided by [Lucide React](https://lucide.dev/)
+- Animation powered by [Framer Motion](https://www.framer.com/motion/)
+
+---
+
+Created with ❤️ | Last updated: April 11, 2025
