@@ -18,6 +18,7 @@ A modern, customizable chat widget built with Next.js and React, designed to be 
 - ✨ Smooth animations and transitions
 - 📱 Full-screen mode on mobile devices
 - 🎛️ Adaptive layout based on viewport size
+- 🛠️ Professional help desk dashboard for administrators
 
 ## Recent Enhancements (April 2025)
 
@@ -27,6 +28,39 @@ A modern, customizable chat widget built with Next.js and React, designed to be 
 - **Fixed Animation Issues**: Resolved stuttering in button animations during transitions
 - **Better Mobile Experience**: Optimized text sizes, spacing, and element dimensions for mobile users
 - **Improved Positioning**: Fixed issues with button positioning and overlaps during transitions
+- **Professional Help Desk**: New comprehensive administration dashboard with ticket management capabilities
+
+## Admin Dashboard Features
+
+The Zephyr Chat Widget now includes a powerful administrative dashboard for help desk management:
+
+### Navigation & Structure
+- Left sidebar with categorized navigation (Inbox, Teams, Teammates, Analytics, Knowledge Base)
+- Thread list panel showing conversation previews with status and priority indicators
+- Detailed conversation view with threaded messages
+- Collapsible right sidebar for customer and ticket details
+
+### Key Functionality
+- Audio/video call integration with screen sharing capability
+- Advanced conversation management with timestamps and visual indicators
+- AI-powered response suggestions to help agents respond faster
+- Complete ticket management with priority levels and unique IDs
+- Team assignment and collaborative support features
+- Status tracking (open, pending, resolved)
+
+### UI/UX Elements
+- Clean, light-themed interface with intuitive navigation
+- Compact message preview cards with sender information and timestamps
+- Contextual action buttons for call management
+- Hover states for all interactive elements
+- Unread message notifications
+
+### Advanced Features
+- AI assistant for suggesting responses and improving communication
+- Customer data panel showing contact history and information
+- Related ticket linking for complex support cases
+- Call recording functionality with mute and screen share options
+- Real-time updates across the platform
 
 ## Tech Stack
 

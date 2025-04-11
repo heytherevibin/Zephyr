@@ -10,6 +10,9 @@ const generateUUID = () => {
   });
 };
 
+// Local storage key for message persistence
+const STORAGE_KEY = 'zephyr_chat_messages';
+
 export const ChatWidget = ({
   position = 'bottom-right',
   offset = 20,
@@ -22,41 +25,56 @@ export const ChatWidget = ({
   const [isOpen, setIsOpen] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [inputText, setInputText] = useState('');
-  
+
   // Bot name consistency
   const botName = headerText || 'Fin';
 
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: "Hi there, welcome to Intercom 👋",
-      isBot: true,
-      sender: botName,
-      role: "AI Agent"
-    },
-    {
-      id: 2,
-      text: "You are now speaking with Fin AI Agent. I can do much more than chatbots you've seen before. Tell me as much as you can about your question and I'll do my best to help you in an instant.",
-      isBot: true,
-      sender: botName,
-      role: "AI Agent"
+  const [messages, setMessages] = useState(() => {
+    // Try to load messages from localStorage on initial render
+    if (typeof window !== 'undefined') {
+      try {
+        const savedMessages = localStorage.getItem(STORAGE_KEY);
+        if (savedMessages) {
+          return JSON.parse(savedMessages);
+        }
+      } catch (error) {
+        console.error('Failed to load messages from localStorage:', error);
+      }
     }
-  ]);
-  
+    
+    // Default initial messages
+    return [
+      {
+        id: 1,
+        text: "Hi there, welcome to Intercom 👋",
+        isBot: true,
+        sender: botName,
+        role: "AI Agent",
+      },
+      {
+        id: 2,
+        text: "You are now speaking with Fin AI Agent. I can do much more than chatbots you've seen before. Tell me as much as you can about your question and I'll do my best to help you in an instant.",
+        isBot: true,
+        sender: botName,
+        role: "AI Agent",
+      }
+    ];
+  });
+
   const fileInputRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const chatContainerRef = useRef(null);
-  
+
   // Sound effects
   const messageSoundRef = useRef(null);
-  
+
   // Initialize sounds
   useEffect(() => {
     if (typeof window !== 'undefined' && soundEnabled) {
       messageSoundRef.current = new Audio('/message.mp3');
     }
   }, [soundEnabled]);
-  
+
   // Auto scroll to bottom when messages change
   useEffect(() => {
     if (messagesContainerRef.current) {
@@ -66,7 +84,7 @@ export const ChatWidget = ({
       }, 100);
     }
   }, [messages]);
-  
+
   // Also scroll to bottom when the chat is opened
   useEffect(() => {
     if (isOpen && messagesContainerRef.current) {
@@ -75,13 +93,13 @@ export const ChatWidget = ({
       }, 300);
     }
   }, [isOpen]);
-  
+
   // Handle mobile full screen mode
   useEffect(() => {
     const handleViewportChange = () => {
       if (typeof window !== 'undefined') {
         const isMobile = window.innerWidth < 640;
-        
+
         if (isOpen && isMobile) {
           document.body.style.overflow = 'hidden';
         } else {
@@ -89,10 +107,10 @@ export const ChatWidget = ({
         }
       }
     };
-    
+
     handleViewportChange();
     window.addEventListener('resize', handleViewportChange);
-    
+
     return () => {
       document.body.style.overflow = '';
       window.removeEventListener('resize', handleViewportChange);
@@ -110,20 +128,31 @@ export const ChatWidget = ({
     if (isOpen) {
       window.addEventListener('keydown', handleEscKey);
     }
-    
+
     return () => {
       window.removeEventListener('keydown', handleEscKey);
     };
   }, [isOpen]);
 
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      } catch (error) {
+        console.error('Failed to save messages to localStorage:', error);
+      }
+    }
+  }, [messages]);
+
   const toggleChat = () => {
     const newIsOpen = !isOpen;
     setIsOpen(newIsOpen);
-    
+
     if (newIsOpen) {
       // Opening chat
       if (onOpen) onOpen();
-      
+
       // Close any open menus
       setShowEmoji(false);
     } else {
@@ -131,25 +160,25 @@ export const ChatWidget = ({
       if (onClose) onClose();
     }
   };
-  
+
   const handleSend = () => {
     if (!inputText.trim()) return;
-    
+
     // Add user message
     const userMessage = {
       id: Date.now(),
       text: inputText,
-      isBot: false
+      isBot: false,
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setShowEmoji(false);
-    
+
     if (onMessageSend) {
       onMessageSend(userMessage);
     }
-    
+
     // Simulate bot response after a delay
     setTimeout(() => {
       const botMessage = {
@@ -157,40 +186,40 @@ export const ChatWidget = ({
         text: "Thank you for your message. This is an automated response from the AI agent.",
         isBot: true,
         sender: botName,
-        role: "AI Agent"
+        role: "AI Agent",
       };
-      
+
       setMessages(prev => [...prev, botMessage]);
-      
+
       // Play message sound if enabled
       if (soundEnabled && messageSoundRef.current) {
         messageSoundRef.current.play().catch(e => console.error('Failed to play message sound:', e));
       }
     }, 1000);
   };
-  
+
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
-  
+
   const handleAttachFile = () => {
     fileInputRef.current.click();
   };
-  
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       // Handle file upload
       console.log("File selected:", file.name);
-      
+
       // Reset file input
       e.target.value = null;
     }
   };
-  
+
   // Calculate position styles with additional bottom offset for close button
   const positionStyles = {
     'bottom-right': { bottom: offset, right: offset },
@@ -198,7 +227,7 @@ export const ChatWidget = ({
     'top-right': { top: offset, right: offset },
     'top-left': { top: offset, left: offset },
   };
-  
+
   // Close button position should match the launcher button
   const closeButtonPosition = {
     'bottom-right': { bottom: offset, right: offset },
@@ -206,7 +235,7 @@ export const ChatWidget = ({
     'top-right': { top: offset, right: offset },
     'top-left': { top: offset, left: offset },
   };
-  
+
   // Logo component
   const Logo = () => (
     <div className="w-5 h-5 flex items-center justify-center">
@@ -215,10 +244,10 @@ export const ChatWidget = ({
       </svg>
     </div>
   );
-  
+
   // Add responsive viewport detection
   const [viewportSize, setViewportSize] = useState('desktop');
-  
+
   // Handle viewport detection
   useEffect(() => {
     const handleResize = () => {
@@ -232,10 +261,10 @@ export const ChatWidget = ({
         }
       }
     };
-    
+
     handleResize(); // Initialize on mount
     window.addEventListener('resize', handleResize);
-    
+
     return () => {
       window.removeEventListener('resize', handleResize);
     };
@@ -260,7 +289,7 @@ export const ChatWidget = ({
         overflow: 'hidden'
       };
     }
-    
+
     // Tablet: almost full height with margins
     else if (viewportSize === 'tablet') {
       return {
@@ -275,7 +304,7 @@ export const ChatWidget = ({
         boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
       };
     }
-    
+
     // Desktop: standard fixed size
     else {
       return {
@@ -290,14 +319,14 @@ export const ChatWidget = ({
       };
     }
   };
-  
+
   // Chat button responsiveness
   const getChatButtonStyles = () => {
     const baseStyles = {
       ...positionStyles[position],
       zIndex: 9999,
     };
-    
+
     // For mobile, ensure the button is positioned properly
     if (viewportSize === 'mobile') {
       return {
@@ -306,7 +335,7 @@ export const ChatWidget = ({
         right: offset,
       };
     }
-    
+
     return baseStyles;
   };
 
@@ -422,29 +451,32 @@ export const ChatWidget = ({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className={`inline-block max-w-[85%] ${viewportSize === 'mobile' ? 'max-w-[90%]' : 'max-w-[85%]'} rounded-2xl ${
-                    message.isBot 
-                      ? 'bg-white shadow-sm border border-gray-100' 
-                      : 'bg-black text-white'
-                  }`}
-                    style={{
-                      borderTopLeftRadius: message.isBot ? '4px' : undefined,
-                      borderTopRightRadius: !message.isBot ? '4px' : undefined
-                    }}
-                  >
-                    {message.isBot && message.sender && (
-                      <div className="flex items-center px-4 pt-3 pb-2">
-                        <div className="w-7 h-7 bg-black rounded-md flex items-center justify-center">
-                          <div className="w-3.5 h-3.5 bg-white rounded-sm"></div>
+                  <div className="relative group">
+                    <div 
+                      className={`inline-block max-w-[85%] ${viewportSize === 'mobile' ? 'max-w-[90%]' : 'max-w-[85%]'} rounded-2xl relative ${
+                        message.isBot 
+                          ? 'bg-white shadow-sm border border-gray-100' 
+                          : 'bg-black text-white'
+                      }`}
+                      style={{
+                        borderTopLeftRadius: message.isBot ? '4px' : undefined,
+                        borderTopRightRadius: !message.isBot ? '4px' : undefined
+                      }}
+                    >
+                      {message.isBot && message.sender && (
+                        <div className="flex items-center px-4 pt-3 pb-2">
+                          <div className="w-7 h-7 bg-black rounded-md flex items-center justify-center">
+                            <div className="w-3.5 h-3.5 bg-white rounded-sm"></div>
+                          </div>
+                          <div className="ml-2">
+                            <div className="font-semibold text-sm text-gray-900">{botName}</div>
+                            <div className="text-[10px] text-gray-500">{message.role}</div>
+                          </div>
                         </div>
-                        <div className="ml-2">
-                          <div className="font-semibold text-sm text-gray-900">{botName}</div>
-                          <div className="text-[10px] text-gray-500">{message.role}</div>
-                        </div>
+                      )}
+                      <div className={`px-4 ${message.isBot && message.sender ? 'pt-1' : 'pt-3'} pb-3`}>
+                        <p className={`text-[15px] leading-relaxed ${viewportSize === 'mobile' ? 'text-sm' : 'text-[15px]'}`}>{message.text}</p>
                       </div>
-                    )}
-                    <div className={`px-4 ${message.isBot && message.sender ? 'pt-1' : 'pt-3'} pb-3`}>
-                      <p className={`text-[15px] leading-relaxed ${viewportSize === 'mobile' ? 'text-sm' : 'text-[15px]'}`}>{message.text}</p>
                     </div>
                   </div>
                   

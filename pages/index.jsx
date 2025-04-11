@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import { ChatWidget } from '../src/components/ChatWidget';
+import { MessageSquare, Users, BarChart2 } from 'lucide-react';
 
 export default function Home() {
   const [widgetConfig, setWidgetConfig] = useState({
@@ -90,6 +92,59 @@ export default function Home() {
               <li>Close and reopen the chat to see persistent history</li>
               <li>Click the three dots menu for more options</li>
             </ol>
+          </div>
+        </div>
+        
+        {/* Admin Dashboard Navigation Section */}
+        <div className="mt-12 max-w-4xl mx-auto">
+          <h2 className="text-2xl font-bold text-center mb-6">Administration Tools</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Link href="/dashboard" className="block">
+              <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-600 hover:shadow-lg transition-shadow group">
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <MessageSquare className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <h3 className="text-lg font-medium ml-3 group-hover:text-blue-600 transition-colors">Help Desk</h3>
+                </div>
+                <p className="text-gray-600 text-sm">Manage customer conversations, tickets, and support requests in the professional help desk interface.</p>
+                <div className="mt-4 flex items-center text-blue-600 text-sm font-medium">
+                  Access Dashboard
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </Link>
+
+            <Link href="/admin" className="block">
+              <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-indigo-600 hover:shadow-lg transition-shadow group">
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <Users className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <h3 className="text-lg font-medium ml-3 group-hover:text-indigo-600 transition-colors">Super Admin</h3>
+                </div>
+                <p className="text-gray-600 text-sm">Platform-wide management for service providers, billing, and system settings.</p>
+                <div className="mt-4 flex items-center text-indigo-600 text-sm font-medium">
+                  Access Admin Panel
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </Link>
+
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-600">
+              <div className="flex items-center mb-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <BarChart2 className="w-6 h-6 text-green-600" />
+                </div>
+                <h3 className="text-lg font-medium ml-3">Analytics</h3>
+              </div>
+              <p className="text-gray-600 text-sm">View detailed reports, track key metrics, and monitor customer satisfaction levels.</p>
+              <div className="mt-4 text-gray-400 text-sm font-medium">Coming Soon</div>
+            </div>
           </div>
         </div>
       </main>
