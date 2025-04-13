@@ -1,107 +1,32 @@
 # Zephyr Chat Widget
 
-A modern, customizable chat widget for web applications with a sleek UI and rich functionality.
-
-## Overview
-
-Zephyr is a professional-grade chat widget that can be easily integrated into any web application. It provides a seamless communication experience between users and support agents with a focus on design, usability, and performance.
+A professional chat widget for websites with multi-department routing, customer satisfaction surveys, analytics tracking, and more.
 
 ## Features
 
-- **Modern UI**: Clean, responsive design with smooth animations and transitions
-- **Multi-tab Interface**: Home, Messages, Help, and News tabs for comprehensive functionality
-- **Real-time Messaging**: Instant message delivery with read receipts and typing indicators
-- **Rich Media Support**: Send text, emojis, files, and images
-- **Help Center Integration**: Browse and search knowledge base articles
-- **News Updates**: Stay informed with the latest product updates and announcements
-- **Keyboard Shortcuts**: Quick navigation with keyboard commands
-- **Customizable**: Adapt the widget to match your brand with customizable colors and styling
-- **Accessibility**: Built with accessibility in mind for all users
-- **Mobile Responsive**: Works seamlessly on desktop and mobile devices
+- Multi-department routing
+- Customer satisfaction surveys
+- Analytics tracking
+- Canned responses
+- Multilingual support
+- File attachments
+- Emoji support
+- Dark mode
+- Mobile responsive
 
 ## Getting Started
 
-### Installation
-
-```bash
-npm install zephyr-chat-widget
-# or
-yarn add zephyr-chat-widget
-```
-
-### Basic Usage
-
-```jsx
-import { ChatWidget } from 'zephyr-chat-widget';
-
-function App() {
-  return (
-    <div>
-      <h1>My Website</h1>
-      <ChatWidget 
-        companyName="Your Company"
-        agentName="Support Agent"
-        primaryColor="#000000"
-      />
-    </div>
-  );
-}
-```
-
-## Customization
-
-The chat widget can be customized with various props:
-
-```jsx
-<ChatWidget 
-  position="bottom-right" // or "bottom-left"
-  offset={20} // distance from the edge of the screen
-  companyName="Your Company"
-  agentName="Support Agent"
-  agentAvatar="https://example.com/avatar.jpg"
-  primaryColor="#000000"
-  onMessageSend={(message) => console.log(message)}
-  onFileUpload={(file) => console.log(file)}
-  enableTypingPreview={true}
-  quickReplies={[
-    { id: '1', text: 'How can I help?', category: 'greeting' },
-    { id: '2', text: 'Thank you!', category: 'closing' }
-  ]}
-  helpArticles={[
-    { 
-      id: '1', 
-      title: 'Getting Started', 
-      content: 'Learn how to use our product...',
-      category: 'Basics',
-      views: 1200
-    }
-  ]}
-  newsItems={[
-    {
-      id: '1',
-      title: 'New Feature Released',
-      content: 'We\'re excited to announce...',
-      date: new Date(),
-      category: 'Product Updates',
-      read: false
-    }
-  ]}
-/>
-```
-
-## Development
-
 ### Prerequisites
 
-- Node.js 14+
+- Node.js 14.x or higher
 - npm or yarn
 
-### Setup
+### Installation
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/zephyr-chat-widget.git
-cd zephyr-chat-widget
+git clone https://github.com/heytherevibin/Zephyr.git
+cd Zephyr
 ```
 
 2. Install dependencies
@@ -111,24 +36,114 @@ npm install
 yarn install
 ```
 
-3. Start the development server
+3. Run the development server
 ```bash
 npm run dev
 # or
 yarn dev
 ```
 
-## Contributing
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Usage
+
+### Basic Implementation
+
+```jsx
+import ChatWidget from './components/ChatWidget';
+
+function App() {
+  return (
+    <ChatWidget
+      position="bottom-right"
+      offset={20}
+      triggerButtonSize={60}
+      headerText="Support"
+      primaryColor="#0066FF"
+      textColor="#FFFFFF"
+      showNotificationBadge={true}
+      notificationCount={0}
+      bubbleAnimation={true}
+      mobileFullScreen={true}
+      soundEnabled={true}
+      darkMode={false}
+    />
+  );
+}
+```
+
+### Advanced Implementation with All Features
+
+```jsx
+import ChatWidget from './components/ChatWidget';
+
+function App() {
+  return (
+    <ChatWidget
+      position="bottom-right"
+      offset={20}
+      triggerButtonSize={60}
+      headerText="Zephyr Support"
+      primaryColor="#0066FF"
+      textColor="#FFFFFF"
+      showNotificationBadge={true}
+      notificationCount={0}
+      bubbleAnimation={true}
+      mobileFullScreen={true}
+      soundEnabled={true}
+      darkMode={false}
+      // Professional features
+      enableDepartmentRouting={true}
+      enableAnalytics={true}
+      enableCannedResponses={true}
+      enableMultilingualSupport={true}
+      userIdentity={{ id: 'user-12345', name: 'John Doe', email: 'john@example.com' }}
+      apiEndpoint="/api/chat"
+      onMessageSend={(msg) => console.log("Message sent:", msg)}
+      showSatisfactionSurvey={true}
+    />
+  );
+}
+```
+
+## Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| position | string | 'bottom-right' | Position of the chat widget ('bottom-right', 'bottom-left') |
+| offset | number | 20 | Offset from the edge of the screen in pixels |
+| triggerButtonSize | number | 60 | Size of the trigger button in pixels |
+| headerText | string | 'Chat' | Text displayed in the chat header |
+| primaryColor | string | '#0066FF' | Primary color for the chat widget |
+| textColor | string | '#FFFFFF' | Text color for the chat widget |
+| showNotificationBadge | boolean | false | Whether to show the notification badge |
+| notificationCount | number | 0 | Number of unread notifications |
+| bubbleAnimation | boolean | true | Whether to animate the chat bubble |
+| mobileFullScreen | boolean | true | Whether to use full screen on mobile devices |
+| soundEnabled | boolean | true | Whether to enable notification sounds |
+| darkMode | boolean | false | Whether to use dark mode |
+| enableDepartmentRouting | boolean | false | Whether to enable department routing |
+| enableAnalytics | boolean | false | Whether to enable analytics tracking |
+| enableCannedResponses | boolean | false | Whether to enable canned responses |
+| enableMultilingualSupport | boolean | false | Whether to enable multilingual support |
+| userIdentity | object | null | User identity information |
+| apiEndpoint | string | '/api/chat' | API endpoint for chat messages |
+| onMessageSend | function | null | Callback function when a message is sent |
+| showSatisfactionSurvey | boolean | false | Whether to show the satisfaction survey |
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- Built with React and TypeScript
-- Styled with Tailwind CSS
-- Animations powered by Framer Motion
-- Icons from Lucide React
+- [Next.js](https://nextjs.org/)
+- [React](https://reactjs.org/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Framer Motion](https://www.framer.com/motion/)
+- [Lucide Icons](https://lucide.dev/)
+- [Emoji Mart](https://github.com/missive/emoji-mart)
+- [Date-fns](https://date-fns.org/)
+- [GSAP](https://greensock.com/gsap/)
+- [jsPDF](https://github.com/parallax/jsPDF)
+- [Socket.io](https://socket.io/)

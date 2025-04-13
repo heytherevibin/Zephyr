@@ -312,6 +312,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     zIndex: 9999,
     [position === 'bottom-right' ? 'right' : 'left']: offset,
     bottom: offset,
+    width: '100%',
+    maxWidth: '400px'
   });
 
   useEffect(() => {
@@ -563,13 +565,6 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
   const renderHelpTab = () => (
     <div className="flex flex-col h-full">
       <div className="relative bg-gradient-to-b from-[#1F1F1F] via-[#000000] to-white text-white p-6 pb-12">
-              <button
-          onClick={() => setIsOpen(false)}
-          className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-full transition-colors"
-        >
-          <X size={20} className="text-white/90" />
-              </button>
-        
         <div className="pt-8 pb-4">
           <h1 className="text-[28px] font-semibold leading-tight mb-2">Help Center</h1>
           <p className="text-[15px] text-white/80">
@@ -666,20 +661,13 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
 
   const renderNewsTab = () => (
     <>
-      <div className="relative bg-gradient-to-b from-[#1F1F1F] via-[#000000] to-white text-white p-6">
-          <button
-          onClick={() => setIsOpen(false)}
-          className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-full transition-colors"
-        >
-          <X size={20} className="text-white/90" />
-          </button>
-        
+      <div className="relative bg-gradient-to-b from-[#1F1F1F] via-[#000000] to-white text-white p-6 pb-12">
         <div className="pt-8 pb-4">
           <h1 className="text-[28px] font-semibold leading-tight mb-2">What's New</h1>
           <p className="text-[15px] text-white/80">
             Stay up to date with our latest updates and features
           </p>
-      </div>
+        </div>
 
         <div className="relative mt-4">
         <input
@@ -769,37 +757,37 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     <>
       {isHomeLoading ? (
         <div className="flex flex-col h-full bg-white">
-          <div className="flex-1 flex items-center justify-center pb-[81px]">
+          <div className="flex-1 flex items-center justify-center">
             <motion.div 
               className="relative"
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
             >
               {/* Background track with gradient */}
               <motion.div 
-                className="w-12 h-12 rounded-full bg-gradient-to-br from-[#000000]/5 to-[#1A1A1A]/5"
+                className="w-10 h-10 rounded-full bg-gradient-to-br from-[#000000]/10 to-[#1A1A1A]/5"
                 animate={{ 
-                  scale: [1, 1.1, 1],
-                  opacity: [0.5, 0.8, 0.5]
+                  scale: [1, 1.05, 1],
+                  opacity: [0.3, 0.5, 0.3]
                 }}
                 transition={{
-                  duration: 2,
+                  duration: 1.5,
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
               />
               {/* Spinning track */}
               <motion.div 
-                className="absolute top-0 left-0 w-12 h-12 rounded-full border-[2px] border-[#000000] border-t-transparent"
+                className="absolute top-0 left-0 w-10 h-10 rounded-full border-[1.5px] border-[#000000] border-t-transparent"
                 animate={{ rotate: 360 }}
                 transition={{
-                  duration: 1.2,
+                  duration: 1,
                   repeat: Infinity,
                   ease: "linear"
                 }}
                 style={{ 
-                  boxShadow: '0 0 12px rgba(0, 0, 0, 0.15)'
+                  boxShadow: '0 0 8px rgba(0, 0, 0, 0.1)'
                 }}
               />
             </motion.div>
@@ -808,28 +796,21 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
       ) : (
         <div className="flex flex-col h-full">
           <div className="relative bg-gradient-to-b from-[#1F1F1F] via-[#000000] to-white text-white p-6">
-      <button 
-              onClick={() => setIsOpen(false)}
-              className="absolute top-5 right-5 p-2.5 hover:bg-gray-100 rounded-full transition-colors z-20"
-      >
-              <X size={22} className="text-white/90" />
-      </button>
-            
             <div className="pt-8 pb-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
                   <MessageSquare className="w-6 h-6 text-white" />
-          </div>
+                </div>
                 <div>
                   <h1 className="text-[28px] font-semibold leading-tight">Hi there 👋</h1>
                   <p className="text-[15px] text-white/80 font-normal">We typically reply within an hour</p>
-        </div>
+                </div>
               </div>
               <p className="text-[16px] text-white/90 leading-relaxed font-normal">
                 Ask us anything, or browse through our most popular topics below.
               </p>
-      </div>
-      
+            </div>
+            
             <div className="relative mt-4">
               <input
                 type="text"
@@ -1142,22 +1123,49 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
   }, []);
 
   // Tooltip component
-  const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }) => (
-    <div className="group relative">
-      {children}
-          <motion.div 
-        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap"
-        initial={{ opacity: 0, y: 5 }}
-        whileHover={{ opacity: 1, y: 0 }}
-        transition={{ 
-          duration: 0.2,
-          ease: "easeOut"
-        }}
+  const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    
+    const handleMouseEnter = () => {
+      timeoutRef.current = setTimeout(() => {
+        setIsVisible(true);
+      }, 500); // 500ms delay
+    };
+    
+    const handleMouseLeave = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      setIsVisible(false);
+    };
+    
+    useEffect(() => {
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    }, []);
+    
+    return (
+      <div 
+        className="group relative"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
-        {text}
-          </motion.div>
-              </div>
-        );
+        {children}
+        <div 
+          className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap transition-opacity duration-200 pointer-events-none ${
+            isVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {text}
+        </div>
+      </div>
+    );
+  };
 
   // Loading skeleton component with improved animation
   const LoadingSkeleton = () => (
@@ -1266,14 +1274,14 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
       {/* Scrollable Messages Area */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-5 scrollbar-none"
+        className="flex-1 overflow-y-auto p-4 sm:p-5 scrollbar-none"
         style={{ 
           scrollBehavior: 'smooth',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-end',
-          msOverflowStyle: 'none',  /* IE and Edge */
-          scrollbarWidth: 'none'     /* Firefox */
+          msOverflowStyle: 'none',
+          scrollbarWidth: 'none'
         }}
       >
         <style jsx>{`
@@ -1287,27 +1295,27 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
               key={message.id}
               className={`flex flex-col ${message.sender === 'user' ? 'items-end' : 'items-start'}`}
             >
-              <div className={`max-w-[80%] rounded-2xl p-4 ${
+              <div className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-3 sm:p-4 ${
                 message.sender === 'user' 
                   ? 'bg-[#000000] text-white' 
                   : 'bg-gray-100 text-gray-900'
               }`}>
-                <p className="text-[15px] leading-relaxed">{message.text}</p>
+                <p className="text-[14px] sm:text-[15px] leading-relaxed">{message.text}</p>
               </div>
               <div className={`flex items-center gap-1.5 mt-1 ${message.sender === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
-                <span className="text-[11px] text-gray-500">
+                <span className="text-[10px] sm:text-[11px] text-gray-500">
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 {message.sender === 'user' && message.status && (
-                  <span className="text-[11px] text-gray-500 flex items-center">
+                  <span className="text-[10px] sm:text-[11px] text-gray-500 flex items-center">
                     {message.status === 'read' && (
-                      <CheckCheck size={12} className="text-black" />
+                      <CheckCheck size={11} className="text-black" />
                     )}
                     {message.status === 'delivered' && (
-                      <Check size={12} />
+                      <Check size={11} />
                     )}
                     {message.status === 'sending' && (
-                      <Clock size={12} className="animate-pulse" />
+                      <Clock size={11} className="animate-pulse" />
                     )}
                   </span>
                 )}
@@ -1318,7 +1326,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
       </div>
 
       {/* Fixed Input Area */}
-      <div className="flex-shrink-0 p-4 border-t border-transparent">
+      <div className="flex-shrink-0 p-3 sm:p-4 border-t border-transparent">
         <div className="relative">
           <textarea
             value={inputText}
@@ -1331,7 +1339,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
             }}
             placeholder="Type your message..."
             rows={1}
-            className="w-full bg-[#F8F9FB] rounded-[30px] py-3.5 pl-4 pr-[120px] outline-none text-[15px] placeholder-gray-400 resize-none max-h-[150px] min-h-[52px] transition-all duration-200"
+            className="w-full bg-[#F8F9FB] rounded-[30px] py-3 sm:py-3.5 pl-4 pr-[120px] outline-none text-[14px] sm:text-[15px] placeholder-gray-400 resize-none max-h-[150px] min-h-[52px] transition-all duration-200"
             style={{
               scrollbarWidth: 'thin',
               scrollbarColor: '#CBD5E1 transparent',
@@ -1386,14 +1394,20 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     <div style={getPositionStyles()} className="font-sans">
       {/* Launcher Button */}
       <Tooltip text="Press ⌘K to open chat">
-          <motion.button
+        <motion.button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center justify-center w-[60px] h-[60px] bg-[#000000] text-white rounded-full shadow-lg hover:shadow-xl transition-all relative"
+          className="flex items-center justify-center w-[60px] h-[60px] bg-[#000000] text-white rounded-full shadow-lg hover:shadow-xl transition-all relative z-50"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           initial={false}
-            aria-label="Open chat"
-          >
+          aria-label="Open chat"
+          style={{
+            position: 'absolute',
+            right: position === 'bottom-right' ? offset : 'auto',
+            left: position === 'bottom-left' ? offset : 'auto',
+            bottom: offset
+          }}
+        >
           {isOpen ? (
             <MessageSquareOff size={28} className="text-white" />
           ) : (
@@ -1402,21 +1416,29 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[12px] w-5 h-5 rounded-full flex items-center justify-center">
               {unreadCount}
-              </span>
-            )}
-          </motion.button>
+            </span>
+          )}
+        </motion.button>
       </Tooltip>
 
       {/* Chat Window */}
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="absolute bottom-[76px] right-0 w-[400px] h-[700px] bg-white rounded-[28px] shadow-2xl flex flex-col"
-            style={{ overflow: 'hidden' }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ 
+              type: "spring", 
+              stiffness: 300, 
+              damping: 25,
+              mass: 0.8
+            }}
+            className="absolute bottom-[76px] right-0 w-full max-w-[400px] h-[700px] bg-white rounded-[16px] shadow-2xl flex flex-col sm:max-w-[400px] md:max-w-[400px] xs:bottom-0 xs:right-0 xs:w-full xs:h-[100vh] xs:rounded-none xs:max-h-[100vh]"
+            style={{ 
+              overflow: 'hidden',
+              marginBottom: '16px'
+            }}
           >
             {/* Pull to refresh indicator */}
             {isRefreshing && (
@@ -1438,9 +1460,9 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
             {activeTab !== 'messages' && (
               <motion.div 
                 className="border-t border-gray-200 w-[400px] h-[81px] flex-shrink-0"
-                initial={{ y: 10, opacity: 0 }}
+                initial={{ y: 5, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
               >
                 <div className="flex items-center justify-around h-full px-4">
                   {[
