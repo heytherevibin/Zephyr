@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageSquare, Home, HelpCircle, MessageCircle, Volume2, Search, ChevronRight, Clock, Settings, Send, Smile, Paperclip, Image, ThumbsUp, Reply, Star, Copy, Check, CheckCheck, ArrowUp, MessageSquareText, BookOpen, Newspaper, MessageCirclePlus, MessageCircleX, MessageSquareDashed, MessageSquareOff } from 'lucide-react';
+import { X, MessageSquare, Home, HelpCircle, MessageCircle, Volume2, Search, ChevronRight, Clock, Settings, Send, Smile, Paperclip, Image, ThumbsUp, Reply, Star, Copy, Check, CheckCheck, ArrowUp, MessageSquareText, BookOpen, Newspaper, MessageCirclePlus, MessageCircleX, MessageSquareDashed, MessageSquareOff, ArrowLeft } from 'lucide-react';
 
 interface Reaction {
   emoji: string;
@@ -72,10 +72,26 @@ interface NewsItem {
 interface ChatWidgetProps {
   position?: 'bottom-right' | 'bottom-left';
   offset?: number;
-  companyName?: string;
-  agentName?: string;
-  agentAvatar?: string;
+  triggerButtonSize?: number;
+  headerText?: string;
   primaryColor?: string;
+  textColor?: string;
+  showNotificationBadge?: boolean;
+  notificationCount?: number;
+  bubbleAnimation?: boolean;
+  mobileFullScreen?: boolean;
+  soundEnabled?: boolean;
+  darkMode?: boolean;
+  enableDepartmentRouting?: boolean;
+  enableAnalytics?: boolean;
+  enableCannedResponses?: boolean;
+  enableMultilingualSupport?: boolean;
+  userIdentity?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  apiEndpoint?: string;
   onMessageSend?: (message: string) => void;
   onFileUpload?: (file: File) => void;
   enableTypingPreview?: boolean;
@@ -85,6 +101,10 @@ interface ChatWidgetProps {
   onNewsRead?: (newsId: string) => void;
   helpArticles?: HelpArticle[];
   newsItems?: NewsItem[];
+  showSatisfactionSurvey?: boolean;
+  companyName?: string;
+  agentName?: string;
+  agentAvatar?: string;
 }
 
 const globalStyles = `
@@ -155,13 +175,34 @@ const globalStyles = `
   }
 `;
 
+// Add the TypingIndicator component near the top of the file after the interfaces
+const TypingIndicator = () => (
+  <div className="flex items-end gap-1 px-4 py-3 bg-gray-100 rounded-2xl w-fit">
+    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+  </div>
+);
+
 const ChatWidget: React.FC<ChatWidgetProps> = ({
   position = 'bottom-right',
   offset = 20,
-  companyName = 'Support Team',
-  agentName = 'Sarah',
-  agentAvatar,
+  triggerButtonSize = 60,
+  headerText = 'Support Team',
   primaryColor = '#000000',
+  textColor = '#ffffff',
+  showNotificationBadge = true,
+  notificationCount = 0,
+  bubbleAnimation = true,
+  mobileFullScreen = false,
+  soundEnabled = true,
+  darkMode = false,
+  enableDepartmentRouting = true,
+  enableAnalytics = true,
+  enableCannedResponses = true,
+  enableMultilingualSupport = true,
+  userIdentity,
+  apiEndpoint,
   onMessageSend,
   onFileUpload,
   enableTypingPreview = true,
@@ -171,6 +212,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
   onNewsRead,
   helpArticles = [],
   newsItems = [],
+  showSatisfactionSurvey = true,
+  companyName = 'Support Team',
+  agentName = 'Sarah',
+  agentAvatar,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'messages' | 'help' | 'news'>('home');
@@ -234,6 +279,85 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
       unread: true
     }
   ]);
+
+  const [activeConversation, setActiveConversation] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<{
+    id: string;
+    title: string;
+    lastMessage: string;
+    timestamp: Date;
+    unread: boolean;
+    messages: Message[];
+  }[]>([
+    {
+      id: '1',
+      title: 'General Support',
+      lastMessage: "Hi there! How can I help you today?",
+      timestamp: new Date(),
+      unread: false,
+      messages: []
+    },
+    {
+      id: '2',
+      title: 'Technical Support',
+      lastMessage: "Could you provide more details about the issue?",
+      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+      unread: true,
+      messages: []
+    }
+  ]);
+
+  // Add state for showing department suggestions
+  const [showDepartmentSuggestions, setShowDepartmentSuggestions] = useState(false);
+  
+  // Add state for bot conversation flow
+  const [botConversationStep, setBotConversationStep] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [needsHumanSupport, setNeedsHumanSupport] = useState<boolean | null>(null);
+  
+  // Add departments data
+  const departments = [
+    { id: 'sales', name: 'Sales', icon: '💼', description: 'Questions about pricing, plans, or purchasing' },
+    { id: 'technical', name: 'Technical Support', icon: '🔧', description: 'Help with technical issues or bugs' },
+    { id: 'billing', name: 'Billing', icon: '💰', description: 'Inquiries about invoices, payments, or refunds' },
+    { id: 'product', name: 'Product Feedback', icon: '💡', description: 'Suggestions or feedback about our products' },
+    { id: 'account', name: 'Account Management', icon: '👤', description: 'Help with account settings or access' }
+  ];
+  
+  // Add subcategories for each department
+  const subcategories = {
+    sales: [
+      { id: 'pricing', name: 'Pricing & Plans' },
+      { id: 'features', name: 'Feature Comparison' },
+      { id: 'upgrade', name: 'Upgrade Options' },
+      { id: 'demo', name: 'Request a Demo' }
+    ],
+    technical: [
+      { id: 'login', name: 'Login Issues' },
+      { id: 'performance', name: 'Performance Problems' },
+      { id: 'integration', name: 'Integration Help' },
+      { id: 'bug', name: 'Report a Bug' }
+    ],
+    billing: [
+      { id: 'invoice', name: 'Invoice Questions' },
+      { id: 'payment', name: 'Payment Methods' },
+      { id: 'refund', name: 'Refund Request' },
+      { id: 'subscription', name: 'Subscription Management' }
+    ],
+    product: [
+      { id: 'suggestion', name: 'Feature Suggestion' },
+      { id: 'feedback', name: 'Product Feedback' },
+      { id: 'roadmap', name: 'Product Roadmap' },
+      { id: 'comparison', name: 'Competitor Comparison' }
+    ],
+    account: [
+      { id: 'settings', name: 'Account Settings' },
+      { id: 'access', name: 'Access Issues' },
+      { id: 'security', name: 'Security Concerns' },
+      { id: 'profile', name: 'Profile Management' }
+    ]
+  };
 
   // Group messages by date
   useEffect(() => {
@@ -333,7 +457,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     }
   }, [messages, inputText, activeTab]);
 
-  // Enhanced message sending
+  // Update the handleSendMessage function to handle department selection
   const handleSendMessage = useCallback(() => {
     if (!inputText.trim() && selectedFiles.length === 0) return;
 
@@ -393,6 +517,219 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
       }, 1000);
     }, 2000);
   }, [inputText, selectedFiles, activeThread, agentAvatar, onMessageSend]);
+
+  // Add function to handle department selection
+  const handleDepartmentSelect = (departmentId: string) => {
+    const department = departments.find(d => d.id === departmentId);
+    if (!department) return;
+    
+    setSelectedCategory(departmentId);
+    setBotConversationStep(1);
+    
+    // Create a new message with the department selection
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      text: `I need help with ${department.name}`,
+      sender: 'user',
+      timestamp: new Date(),
+      status: 'sending',
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Update message status after sending
+    setTimeout(() => {
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id 
+          ? { ...msg, status: 'delivered' } 
+          : msg
+      ));
+    }, 1000);
+    
+    // Simulate agent typing and response
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      const response: Message = {
+        id: (Date.now() + 1).toString(),
+        text: `I understand you need help with ${department.name.toLowerCase()}. Could you please specify what you need assistance with?`,
+        sender: 'agent',
+        timestamp: new Date(),
+        avatar: agentAvatar,
+        status: 'sent'
+      };
+      setMessages(prev => [...prev, response]);
+      setLastReadTimestamp(new Date());
+      
+      // Update original message status to read
+      setTimeout(() => {
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { ...msg, status: 'read' } 
+            : msg
+        ));
+      }, 1000);
+    }, 2000);
+  };
+  
+  // Add function to handle subcategory selection
+  const handleSubcategorySelect = (subcategoryId: string) => {
+    if (!selectedCategory) return;
+    
+    const subcategory = subcategories[selectedCategory as keyof typeof subcategories].find(s => s.id === subcategoryId);
+    if (!subcategory) return;
+    
+    setSelectedSubcategory(subcategoryId);
+    setBotConversationStep(2);
+    
+    // Create a new message with the subcategory selection
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      text: `I need help with ${subcategory.name}`,
+      sender: 'user',
+      timestamp: new Date(),
+      status: 'sending',
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Update message status after sending
+    setTimeout(() => {
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id 
+          ? { ...msg, status: 'delivered' } 
+          : msg
+      ));
+    }, 1000);
+    
+    // Simulate agent typing and response
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      const response: Message = {
+        id: (Date.now() + 1).toString(),
+        text: `I've found some helpful information about ${subcategory.name.toLowerCase()}. Would you like to speak with a human representative for more personalized assistance?`,
+        sender: 'agent',
+        timestamp: new Date(),
+        avatar: agentAvatar,
+        status: 'sent'
+      };
+      setMessages(prev => [...prev, response]);
+      setLastReadTimestamp(new Date());
+      
+      // Update original message status to read
+      setTimeout(() => {
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { ...msg, status: 'read' } 
+            : msg
+        ));
+      }, 1000);
+    }, 2000);
+  };
+  
+  // Add function to handle human support selection
+  const handleHumanSupportSelect = (needsSupport: boolean) => {
+    setNeedsHumanSupport(needsSupport);
+    
+    if (needsSupport) {
+      setBotConversationStep(3);
+      setShowDepartmentSuggestions(false);
+      
+      // Create a new message with the human support request
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        text: "Yes, I'd like to speak with a human representative",
+        sender: 'user',
+        timestamp: new Date(),
+        status: 'sending',
+      };
+      
+      setMessages(prev => [...prev, newMessage]);
+      
+      // Update message status after sending
+      setTimeout(() => {
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { ...msg, status: 'delivered' } 
+            : msg
+        ));
+      }, 1000);
+      
+      // Simulate agent typing and response
+      setIsTyping(true);
+      setTimeout(() => {
+        setIsTyping(false);
+        const response: Message = {
+          id: (Date.now() + 1).toString(),
+          text: "I've connected you with a human representative. They'll be with you shortly. In the meantime, feel free to provide any additional details about your issue.",
+          sender: 'agent',
+          timestamp: new Date(),
+          avatar: agentAvatar,
+          status: 'sent'
+        };
+        setMessages(prev => [...prev, response]);
+        setLastReadTimestamp(new Date());
+        
+        // Update original message status to read
+        setTimeout(() => {
+          setMessages(prev => prev.map(msg => 
+            msg.id === newMessage.id 
+              ? { ...msg, status: 'read' } 
+              : msg
+          ));
+        }, 1000);
+      }, 2000);
+    } else {
+      // User doesn't need human support, show typing area
+      setShowDepartmentSuggestions(false);
+      
+      // Create a new message with the no human support request
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        text: "No, I don't need human support",
+        sender: 'user',
+        timestamp: new Date(),
+        status: 'sending',
+      };
+      
+      setMessages(prev => [...prev, newMessage]);
+      
+      // Update message status after sending
+      setTimeout(() => {
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { ...msg, status: 'delivered' } 
+            : msg
+        ));
+      }, 1000);
+      
+      // Simulate agent typing and response
+      setIsTyping(true);
+      setTimeout(() => {
+        setIsTyping(false);
+        const response: Message = {
+          id: (Date.now() + 1).toString(),
+          text: "I understand. Is there anything else I can help you with?",
+          sender: 'agent',
+          timestamp: new Date(),
+          avatar: agentAvatar,
+          status: 'sent'
+        };
+        setMessages(prev => [...prev, response]);
+        setLastReadTimestamp(new Date());
+        
+        // Update original message status to read
+        setTimeout(() => {
+          setMessages(prev => prev.map(msg => 
+            msg.id === newMessage.id 
+              ? { ...msg, status: 'read' } 
+              : msg
+          ));
+        }, 1000);
+      }, 2000);
+    }
+  };
 
   // Enhanced file upload
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -615,18 +952,23 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
             <>
               {/* Categories */}
               <div className="mb-8">
-                <h2 className="text-[16px] font-semibold text-gray-900 mb-4">Categories</h2>
+                <div className="flex items-center justify-between px-1 mb-3">
+                  <h2 className="text-[16px] font-semibold text-gray-900">Categories</h2>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {['Getting Started', 'Account & Billing', 'Features', 'Troubleshooting'].map((category) => (
                     <button
                       key={category}
-                      className="bg-gray-50 hover:bg-gray-100 p-4 rounded-2xl text-left transition-all group"
+                      className="bg-white hover:bg-gray-50 p-4 rounded-2xl text-left border border-gray-200 group relative overflow-hidden transition-all duration-300"
                     >
-                      <h3 className="text-[15px] font-medium text-gray-900 mb-1">{category}</h3>
-                      <div className="flex items-center text-gray-600">
-                        <span className="text-[14px]">View articles</span>
-                        <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
-                </div>
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-2">
+                          <BookOpen className="w-5 h-5 text-gray-900" />
+                          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:translate-x-0.5 transition-transform duration-500" />
+                        </div>
+                        <h3 className="text-[15px] font-medium text-gray-900 transition-colors duration-500 ease-in-out mb-1">{category}</h3>
+                        <p className="text-[14px] text-gray-600 transition-colors duration-500 ease-in-out">View articles</p>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -716,21 +1058,22 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
           ) : (
             <div className="space-y-4">
               {newsItems.map((item) => (
-          <button
+                <button
                   key={item.id}
                   onClick={() => handleNewsClick(item.id)}
-                  className={`w-full p-4 rounded-2xl text-left transition-all ${
-                    item.read ? 'bg-gray-50' : 'bg-gray-100'
-                  } hover:bg-gray-200`}
+                  className="w-full bg-gray-50 hover:bg-gray-100 p-4 rounded-2xl text-left transition-all group"
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      item.read ? 'bg-gray-100' : 'bg-gray-200'
-                    }`}>
-                      <Volume2 className={`w-5 h-5 ${item.read ? 'text-gray-600' : 'text-gray-800'}`} />
-        </div>
-                    <div>
-                      <h3 className="text-[15px] font-medium text-gray-900 mb-1">{item.title}</h3>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0">
+                      <Volume2 className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-medium text-[15px] text-gray-900">{item.title}</p>
+                        {!item.read && (
+                          <span className="w-2 h-2 bg-black rounded-full flex-shrink-0" />
+                        )}
+                      </div>
                       <p className="text-[14px] text-gray-600 line-clamp-2">{item.content}</p>
                       <div className="flex items-center gap-2 mt-2 text-gray-500">
                         <span className="text-[13px]">{item.category}</span>
@@ -741,13 +1084,13 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                             day: 'numeric' 
                           })}
                         </span>
-          </div>
-      </div>
+                      </div>
+                    </div>
                   </div>
-          </button>
-        ))}
-      </div>
-        )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -886,7 +1229,32 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                       title: 'Start new', 
                       desc: 'Send us a message', 
                       icon: MessageSquare, 
-                      action: () => setActiveTab('messages'),
+                      action: () => {
+                        setActiveTab('messages');
+                        const newConversation = {
+                          id: Date.now().toString(),
+                          title: 'New Conversation',
+                          lastMessage: '',
+                          timestamp: new Date(),
+                          unread: false,
+                          messages: []
+                        };
+                        setConversations(prev => [newConversation, ...prev]);
+                        setActiveConversation(newConversation.id);
+                        setNeedsHumanSupport(true);
+                        setBotConversationStep(3);
+                        
+                        const greeting: Message = {
+                          id: Date.now().toString(),
+                          text: "Hi there! 👋 How can I help you today?",
+                          sender: 'agent',
+                          timestamp: new Date(),
+                          avatar: agentAvatar,
+                          status: 'sent'
+                        };
+                        
+                        setMessages([greeting]);
+                      },
                       primary: true
                     },
                     { 
@@ -907,31 +1275,30 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                       desc: 'Preferences', 
                       icon: Settings,
                       action: () => {
-                        // Handle settings click
                         console.log('Settings clicked');
                       }
                     }
                   ].map((action) => (
-          <button 
+                    <button 
                       key={action.title}
                       onClick={action.action}
-                      className={`relative bg-gray-50 hover:bg-gray-100 p-4 rounded-2xl text-left transition-all group ${
-                        action.primary ? 'bg-gray-100 hover:bg-gray-200' : ''
-                      }`}
+                      className="bg-gray-50 hover:bg-gray-100 px-4 py-3 rounded-2xl text-left transition-all group"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <action.icon className={`w-5 h-5 ${action.primary ? 'text-gray-900' : 'text-gray-700'}`} />
-                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-2">
+                          <action.icon className="w-5 h-5 text-gray-900" />
+                          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:translate-x-0.5 transition-transform duration-500" />
+                        </div>
+                        <p className="font-medium text-[15px] text-gray-900">
+                          {action.title}
+                        </p>
+                        <p className="text-[14px] text-gray-600 mt-0.5">{action.desc}</p>
+                        {action.badge && (
+                          <span className="absolute top-3 right-3 bg-black text-white text-[12px] w-5 h-5 rounded-full flex items-center justify-center">
+                            {action.badge}
+                          </span>
+                        )}
                       </div>
-                      <p className={`font-medium text-[15px] ${action.primary ? 'text-gray-900' : 'text-gray-900'}`}>
-                        {action.title}
-                      </p>
-                      <p className="text-[14px] text-gray-600 mt-0.5">{action.desc}</p>
-                      {action.badge && (
-                        <span className="absolute top-3 right-3 bg-black text-white text-[12px] w-5 h-5 rounded-full flex items-center justify-center">
-                          {action.badge}
-                        </span>
-                      )}
                     </button>
                   ))}
                 </div>
@@ -942,29 +1309,114 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                 <h2 className="text-[16px] font-semibold text-gray-900 mb-4">Popular articles</h2>
                 <div className="space-y-2">
                   {helpArticles.slice(0, 4).map((article) => (
-          <button 
+                    <button 
                       key={article.id}
                       onClick={() => {
                         setActiveTab('help');
                         handleArticleClick(article.id);
                       }}
-                      className="w-full group bg-gray-50 hover:bg-gray-100 px-4 py-3 rounded-xl text-left transition-all flex items-center justify-between"
+                      className="w-full bg-gray-50 hover:bg-gray-100 px-4 py-3 rounded-2xl text-left transition-all group"
                     >
-                      <div className="min-w-0">
-                        <p className="text-[15px] text-gray-900 truncate">{article.title}</p>
-                        <div className="flex items-center gap-2 mt-1 text-gray-500">
-                          <span className="text-[13px]">{article.category}</span>
-                          <span className="text-[13px]">•</span>
-                          <span className="text-[13px]">{article.views} views</span>
+                      <div className="relative z-10 flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="text-[15px] text-gray-900 truncate">{article.title}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[13px] text-gray-600">{article.category}</span>
+                            <span className="text-[13px] text-gray-600">•</span>
+                            <span className="text-[13px] text-gray-600">{article.views} views</span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-600 group-hover:translate-x-0.5 transition-transform duration-500 flex-shrink-0 ml-3" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Categories */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between px-1 mb-3">
+                  <h2 className="text-[16px] font-semibold text-gray-900">Categories</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {['Getting Started', 'Account & Billing', 'Features', 'Troubleshooting'].map((category) => (
+                    <button
+                      key={category}
+                      className="bg-white hover:bg-gray-50 p-4 rounded-2xl text-left border border-gray-200 group relative overflow-hidden transition-all duration-300"
+                    >
+                      <div className="relative z-10">
+                        <h3 className="text-[15px] font-medium text-gray-900 transition-colors duration-500 ease-in-out mb-1">{category}</h3>
+                        <div className="flex items-center text-gray-600">
+                          <span className="text-[14px] transition-colors duration-500 ease-in-out">View articles</span>
+                          <ChevronRight className="w-4 h-4 ml-1 text-gray-600 group-hover:translate-x-0.5 transition-transform duration-500" />
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform flex-shrink-0 ml-3" />
-          </button>
+                    </button>
                   ))}
-      </div>
-    </div>
-                  </div>
+                </div>
+              </div>
+
+              {/* Search Results */}
+              {searchQuery && (
+                <div className="space-y-4">
+                  {searchResults.articles.map((article) => (
+                    <button
+                      key={article.id}
+                      onClick={() => handleArticleClick(article.id)}
+                      className="w-full bg-black hover:bg-slate-700 p-4 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
+                      <div className="relative z-10">
+                        <h3 className="text-[15px] font-medium text-white transition-colors duration-500 ease-in-out mb-1">{article.title}</h3>
+                        <p className="text-[14px] text-white/80 transition-colors duration-500 ease-in-out line-clamp-2">{article.content}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-[13px] text-white/80 transition-colors duration-500 ease-in-out">{article.category}</span>
+                          <span className="text-[13px] text-white/80">•</span>
+                          <span className="text-[13px] text-white/80 transition-colors duration-500 ease-in-out">{article.views} views</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* News Items */}
+              <div className="space-y-3">
+                {newsItems.slice(0, 2).map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNewsClick(item.id)}
+                    className="w-full bg-gray-50 hover:bg-gray-100 p-4 rounded-2xl text-left transition-all group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0">
+                        <Volume2 className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-medium text-[15px] text-gray-900">{item.title}</p>
+                          {!item.read && (
+                            <span className="w-2 h-2 bg-black rounded-full flex-shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[14px] text-gray-600 line-clamp-2">{item.content}</p>
+                        <div className="flex items-center gap-2 mt-2 text-gray-500">
+                          <span className="text-[13px]">{item.category}</span>
+                          <span className="text-[13px]">•</span>
+                          <span className="text-[13px]">
+                            {item.date.toLocaleDateString(undefined, { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
+          </div>
         </div>
       )}
     </>
@@ -1108,19 +1560,158 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     }
   };
 
+  // Add cleanup for touch events
   useEffect(() => {
-    const element = pullToRefreshRef.current;
-    if (element) {
+    if (pullToRefreshRef.current) {
+      const element = pullToRefreshRef.current;
       element.addEventListener('touchstart', handleTouchStart);
       element.addEventListener('touchmove', handleTouchMove);
       element.addEventListener('touchend', handleTouchEnd);
-    return () => {
+
+      return () => {
         element.removeEventListener('touchstart', handleTouchStart);
         element.removeEventListener('touchmove', handleTouchMove);
         element.removeEventListener('touchend', handleTouchEnd);
-    };
+      };
     }
   }, []);
+
+  // Cleanup for message container scroll position
+  useEffect(() => {
+    const messageContainer = messagesContainerRef.current;
+    if (messageContainer && activeTab === 'messages') {
+      const handleScroll = () => {
+        // Store scroll position logic here
+        localStorage.setItem('chatScrollPosition', messageContainer.scrollTop.toString());
+      };
+      
+      messageContainer.addEventListener('scroll', handleScroll);
+      return () => messageContainer.removeEventListener('scroll', handleScroll);
+    }
+  }, [activeTab]);
+
+  // Cleanup for file input change event
+  useEffect(() => {
+    const fileInput = fileInputRef.current;
+    if (fileInput) {
+      const handleNativeFileChange = async (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        const files = target.files;
+        if (!files) return;
+
+        try {
+          const newFiles: FileAttachment[] = await Promise.all(
+            Array.from(files).map(async (file) => {
+              const previewUrl = file.type.startsWith('image/') 
+                ? URL.createObjectURL(file)
+                : undefined;
+
+              return {
+                id: Date.now().toString(),
+                name: file.name,
+                type: file.type,
+                url: URL.createObjectURL(file),
+                previewUrl,
+                size: file.size
+              };
+            })
+          );
+
+          setSelectedFiles(prev => [...prev, ...newFiles]);
+          if (onFileUpload && files[0]) {
+            onFileUpload(files[0]);
+          }
+        } catch (error) {
+          console.error('Error uploading files:', error);
+        }
+      };
+
+      fileInput.addEventListener('change', handleNativeFileChange);
+      return () => fileInput.removeEventListener('change', handleNativeFileChange);
+    }
+  }, [onFileUpload]);
+
+  // Cleanup for home tab loading progress
+  useEffect(() => {
+    let progressTimer: NodeJS.Timeout | null = null;
+    
+    if (activeTab === 'home' && !hasHomeLoaded) {
+      setIsHomeLoading(true);
+      setLoadingProgress(0);
+      
+      const duration = 2000;
+      const interval = 20;
+      const steps = duration / interval;
+      const increment = 100 / steps;
+      
+      progressTimer = setInterval(() => {
+        setLoadingProgress(prev => {
+          const next = Math.min(prev + increment, 100);
+          if (next === 100) {
+            if (progressTimer) clearInterval(progressTimer);
+            setTimeout(() => {
+              setIsHomeLoading(false);
+              setHasHomeLoaded(true);
+            }, 200);
+          }
+          return next;
+        });
+      }, interval);
+    }
+
+    return () => {
+      if (progressTimer) clearInterval(progressTimer);
+    };
+  }, [activeTab, hasHomeLoaded]);
+
+  // Cleanup for keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Prevent handling if input is focused
+      if (document.activeElement?.tagName === 'INPUT' || 
+          document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setIsOpen(!isOpen);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isOpen]);
+
+  // Cleanup for object URLs
+  useEffect(() => {
+    const urls = selectedFiles.map(file => file.url).filter(Boolean);
+    const previewUrls = selectedFiles.map(file => file.previewUrl).filter(Boolean);
+    
+    return () => {
+      [...urls, ...previewUrls].forEach(url => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, [selectedFiles]);
+
+  // Cleanup for message typing indicator
+  useEffect(() => {
+    let typingTimer: NodeJS.Timeout | null = null;
+    
+    if (isTyping) {
+      typingTimer = setTimeout(() => {
+        setIsTyping(false);
+      }, 3000); // Reset typing indicator after 3 seconds of inactivity
+    }
+
+    return () => {
+      if (typingTimer) clearTimeout(typingTimer);
+    };
+  }, [isTyping]);
 
   // Tooltip component
   const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }) => {
@@ -1242,153 +1833,440 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     }
   };
 
+  // Update the renderMessagesTab function to show department suggestions
   const renderMessagesTab = () => (
     <div className="flex flex-col h-full">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 relative bg-white text-gray-900 p-5 pb-4 border-b border-gray-200">
-        <button
-          onClick={handleCloseButtonClick}
-          className="absolute top-5 right-5 p-2.5 hover:bg-gray-100 rounded-lg transition-colors z-20"
-          aria-label="Return to home"
-        >
-          <X size={22} className="text-gray-700" />
-        </button>
-        
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center">
-            {agentAvatar ? (
-              <img src={agentAvatar} alt={agentName} className="w-full h-full rounded-full object-cover" />
-            ) : (
-              <span className="text-gray-700 text-xl font-semibold">S</span>
-            )}
+      {!activeConversation ? (
+        // Conversations List View
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex-shrink-0 relative bg-white text-gray-900 p-5 pb-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Messages</h2>
+              <button
+                onClick={handleCloseButtonClick}
+                className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Return to home"
+              >
+                <X size={22} className="text-gray-700" />
+              </button>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-medium text-gray-900">{agentName}</h2>
-            <p className="text-sm text-gray-500">
-              {isTyping ? 'Typing...' : 'Online'}
-            </p>
+
+          {/* Conversations List */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-5 space-y-3">
+              {conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  onClick={() => setActiveConversation(conversation.id)}
+                  className="w-full bg-white hover:bg-gray-50 p-4 rounded-xl text-left transition-all border border-gray-100 group"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-medium text-[15px]">
+                        {conversation.title.charAt(0)}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-medium text-[15px] text-gray-900">{conversation.title}</h3>
+                        <span className="text-[13px] text-gray-500">{formatTimeAgo(conversation.timestamp)}</span>
+                      </div>
+                      <p className="text-[14px] text-gray-600 line-clamp-2">{conversation.lastMessage}</p>
+                      {conversation.unread && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="w-2 h-2 bg-black rounded-full" />
+                          <span className="text-[13px] text-gray-500">Unread</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* New Chat Button */}
+          <div className="p-5">
+            <button
+              onClick={() => {
+                const newConversation = {
+                  id: Date.now().toString(),
+                  title: 'New Conversation',
+                  lastMessage: '',
+                  timestamp: new Date(),
+                  unread: false,
+                  messages: []
+                };
+                setConversations(prev => [newConversation, ...prev]);
+                setActiveConversation(newConversation.id);
+                setShowDepartmentSuggestions(true);
+                setBotConversationStep(0);
+                setSelectedCategory(null);
+                setSelectedSubcategory(null);
+                setNeedsHumanSupport(null);
+                
+                const greeting: Message = {
+                  id: Date.now().toString(),
+                  text: "Hi there! 👋 How can I help you today?",
+                  sender: 'agent',
+                  timestamp: new Date(),
+                  avatar: agentAvatar,
+                  status: 'sent'
+                };
+                
+                setMessages([greeting]);
+              }}
+              className="w-full bg-black hover:bg-slate-700 px-4 py-3 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageCirclePlus size={18} className="text-white" />
+                  <span className="text-[14px] font-medium text-white">Ask a question</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-white group-hover:translate-x-0.5 transition-transform duration-500" />
+              </div>
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* Scrollable Messages Area */}
-      <div 
-        ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 sm:p-5 scrollbar-none"
-        style={{ 
-          scrollBehavior: 'smooth',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-end',
-          msOverflowStyle: 'none',
-          scrollbarWidth: 'none'
-        }}
-      >
-        <style jsx>{`
-          div::-webkit-scrollbar {
-            display: none;  /* Chrome, Safari and Opera */
-          }
-        `}</style>
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex flex-col ${message.sender === 'user' ? 'items-end' : 'items-start'}`}
-            >
-              <div className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-3 sm:p-4 ${
-                message.sender === 'user' 
-                  ? 'bg-[#000000] text-white' 
-                  : 'bg-gray-100 text-gray-900'
-              }`}>
-                <p className="text-[14px] sm:text-[15px] leading-relaxed">{message.text}</p>
+      ) : (
+        // Individual Chat View
+        <div className="flex flex-col h-full">
+          {/* Chat Header */}
+          <div className="flex-shrink-0 relative bg-white text-gray-900 p-5 pb-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setActiveConversation(null)}
+                  className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="Back to conversations"
+                >
+                  <ArrowLeft size={22} className="text-gray-700" />
+                </button>
+                <h2 className="text-lg font-medium text-gray-900">
+                  {conversations.find(c => c.id === activeConversation)?.title || 'Chat'}
+                </h2>
               </div>
-              <div className={`flex items-center gap-1.5 mt-1 ${message.sender === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
-                <span className="text-[10px] sm:text-[11px] text-gray-500">
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                {message.sender === 'user' && message.status && (
-                  <span className="text-[10px] sm:text-[11px] text-gray-500 flex items-center">
-                    {message.status === 'read' && (
-                      <CheckCheck size={11} className="text-black" />
+              <button
+                onClick={handleCloseButtonClick}
+                className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Close chat"
+              >
+                <X size={22} className="text-gray-700" />
+              </button>
+            </div>
+          </div>
+
+          {/* Messages Area with Improved Scrolling */}
+          <div 
+            ref={messagesContainerRef}
+            className="flex-1 overflow-y-auto p-4 sm:p-5 scrollbar-none"
+            style={{ 
+              scrollBehavior: 'smooth',
+              msOverflowStyle: 'none',
+              scrollbarWidth: 'none',
+              WebkitOverflowScrolling: 'touch'
+            }}
+          >
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex flex-col ${message.sender === 'user' ? 'items-end' : 'items-start'}`}
+                >
+                  <div className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-3 sm:p-4 ${
+                    message.sender === 'user' 
+                      ? 'bg-[#000000] text-white' 
+                      : 'bg-gray-100 text-gray-900'
+                  }`}>
+                    <p className="text-[14px] sm:text-[15px] leading-relaxed">{message.text}</p>
+                  </div>
+                  <div className={`flex items-center gap-1.5 mt-1 ${message.sender === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
+                    <span className="text-[10px] sm:text-[11px] text-gray-500">
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {message.sender === 'user' && message.status && (
+                      <span className="text-[10px] sm:text-[11px] text-gray-500 flex items-center">
+                        {message.status === 'read' && (
+                          <CheckCheck size={11} className="text-black" />
+                        )}
+                        {message.status === 'delivered' && (
+                          <Check size={11} />
+                        )}
+                        {message.status === 'sending' && (
+                          <Clock size={11} className="animate-pulse" />
+                        )}
+                      </span>
                     )}
-                    {message.status === 'delivered' && (
-                      <Check size={11} />
-                    )}
-                    {message.status === 'sending' && (
-                      <Clock size={11} className="animate-pulse" />
-                    )}
-                  </span>
-                )}
+                  </div>
+                </div>
+              ))}
+              
+              {/* Show typing indicator when isTyping is true */}
+              {isTyping && (
+                <div className="flex flex-col items-start">
+                  <TypingIndicator />
+                </div>
+              )}
+
+              {/* Enhanced Suggestions */}
+              {messages.length > 0 && messages[messages.length - 1].sender === 'agent' && (
+                <div className="mt-4">
+                  {/* Initial Department Selection */}
+                  {showDepartmentSuggestions && !selectedCategory && (
+                    <div className="flex flex-wrap gap-2">
+                      {departments
+                        .filter(dept => !messages.some(msg => 
+                          msg.text.toLowerCase().includes(dept.name.toLowerCase())
+                        ))
+                        .map((dept) => (
+                          <button
+                            key={dept.id}
+                            onClick={() => handleDepartmentSelect(dept.id)}
+                            className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                          >
+                            <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
+                            <div className="flex items-center gap-2 relative z-10">
+                              <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">
+                                {dept.id === 'billing' && '💳'}
+                                {dept.id === 'technical' && '🔧'}
+                                {dept.id === 'account' && '👤'}
+                                {dept.id === 'general' && '💬'}
+                                {dept.id === 'sales' && '💼'}
+                                {dept.id === 'product' && '💡'}
+                              </span>
+                              <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">{dept.name}</span>
+                            </div>
+                          </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          setShowDepartmentSuggestions(false);
+                          setNeedsHumanSupport(true);
+                          setBotConversationStep(3);
+                          const newMessage: Message = {
+                            id: Date.now().toString(),
+                            text: "I'd like to chat with a human representative",
+                            sender: 'user',
+                            timestamp: new Date(),
+                            status: 'sending',
+                          };
+                          setMessages(prev => [...prev, newMessage]);
+                          
+                          // Simulate agent response
+                          setIsTyping(true);
+                          setTimeout(() => {
+                            setIsTyping(false);
+                            const response: Message = {
+                              id: (Date.now() + 1).toString(),
+                              text: "I'm connecting you with a human representative. How can we help you today?",
+                              sender: 'agent',
+                              timestamp: new Date(),
+                              avatar: agentAvatar,
+                              status: 'sent'
+                            };
+                            setMessages(prev => [...prev, response]);
+                          }, 1000);
+                        }}
+                        className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
+                        <div className="flex items-center gap-2 relative z-10">
+                          <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">🤝</span>
+                          <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">Chat with a human</span>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Subcategory Selection */}
+                  {selectedCategory && !selectedSubcategory && !needsHumanSupport && (
+                    <div className="flex flex-wrap gap-2">
+                      {subcategories[selectedCategory as keyof typeof subcategories]
+                        .filter(sub => !messages.some(msg => 
+                          msg.text.toLowerCase().includes(sub.name.toLowerCase())
+                        ))
+                        .map((sub) => (
+                          <button
+                            key={sub.id}
+                            onClick={() => handleSubcategorySelect(sub.id)}
+                            className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                          >
+                            <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
+                            <div className="flex items-center gap-2 relative z-10">
+                              <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">
+                                {sub.id.includes('payment') && '💰'}
+                                {sub.id.includes('subscription') && '📅'}
+                                {sub.id.includes('refund') && '↩️'}
+                                {sub.id.includes('invoice') && '📄'}
+                                {sub.id.includes('setup') && '⚙️'}
+                                {sub.id.includes('error') && '⚠️'}
+                                {sub.id.includes('access') && '🔑'}
+                                {sub.id.includes('login') && '🔒'}
+                                {!sub.id.match(/(payment|subscription|refund|invoice|setup|error|access|login)/) && '📝'}
+                              </span>
+                              <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">{sub.name}</span>
+                            </div>
+                          </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Final Actions */}
+                  {selectedSubcategory && !needsHumanSupport && (
+                    <div className="flex flex-wrap gap-2">
+                      {!messages.some(msg => msg.text.toLowerCase().includes('chat with agent')) && (
+                        <button
+                          onClick={() => handleHumanSupportSelect(true)}
+                          className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                        >
+                          <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
+                          <div className="flex items-center gap-2 relative z-10">
+                            <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">👥</span>
+                            <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">Chat with an agent</span>
+                          </div>
+                        </button>
+                      )}
+                      {!messages.some(msg => msg.text.toLowerCase().includes('view help guide')) && (
+                        <button
+                          onClick={() => handleSuggestionClick({ id: 'self_help', text: 'View help guide' })}
+                          className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                        >
+                          <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
+                          <div className="flex items-center gap-2 relative z-10">
+                            <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">📚</span>
+                            <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">View help guide</span>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Input Area - Only show if human support is selected */}
+          {needsHumanSupport === true && (
+            <div className="flex-shrink-0 p-3 sm:p-4 border-t border-transparent">
+              <div className="relative">
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder="Type your message..."
+                  rows={1}
+                  className="w-full bg-[#F8F9FB] rounded-[30px] py-3 sm:py-3.5 pl-4 pr-[120px] outline-none text-[14px] sm:text-[15px] placeholder-gray-400 text-gray-900 resize-none max-h-[150px] min-h-[52px] transition-all duration-200"
+                  style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#CBD5E1 transparent',
+                    overflowY: inputText ? 'auto' : 'hidden'
+                  }}
+                />
+                <div className="absolute right-[0.48rem] top-[45%] -translate-y-1/2 flex items-center justify-center gap-1">
+                  {!inputText.trim() ? (
+                    <>
+                      <button 
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <Smile size={20} />
+                      </button>
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <Paperclip size={20} />
+                      </button>
+                      <button 
+                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <Image size={20} />
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={handleSendMessage}
+                      className="p-2 text-white hover:text-white/90 transition-colors bg-black rounded-full hover:bg-black/90 flex items-center justify-center w-10 h-10"
+                      style={{ marginTop: '1px' }}
+                    >
+                      <ArrowUp size={20} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          ))}
+          )}
         </div>
-      </div>
-
-      {/* Fixed Input Area */}
-      <div className="flex-shrink-0 p-3 sm:p-4 border-t border-transparent">
-        <div className="relative">
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            placeholder="Type your message..."
-            rows={1}
-            className="w-full bg-[#F8F9FB] rounded-[30px] py-3 sm:py-3.5 pl-4 pr-[120px] outline-none text-[14px] sm:text-[15px] placeholder-gray-400 resize-none max-h-[150px] min-h-[52px] transition-all duration-200"
-            style={{
-              scrollbarWidth: 'thin',
-              scrollbarColor: '#CBD5E1 transparent',
-              overflowY: inputText ? 'auto' : 'hidden'
-            }}
-          />
-          <div className="absolute right-[0.48rem] top-[45%] -translate-y-1/2 flex items-center justify-center gap-1">
-            {!inputText.trim() ? (
-              <>
-                <button 
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <Smile size={20} />
-                </button>
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <Paperclip size={20} />
-                </button>
-                <button 
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <Image size={20} />
-                </button>
-              </>
-            ) : (
-              <button 
-                onClick={handleSendMessage}
-                className="p-2 text-white hover:text-white/90 transition-colors bg-black rounded-full hover:bg-black/90 flex items-center justify-center w-10 h-10"
-                style={{ marginTop: '1px' }}
-              >
-                <ArrowUp size={20} />
-              </button>
-            )}
-          </div>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          onChange={handleFileUpload}
-          className="hidden"
-          accept="image/*,.pdf,.doc,.docx"
-          multiple
-        />
-      </div>
+      )}
     </div>
   );
+
+  // Add quick suggestions data
+  const quickSuggestions = [
+    { id: 'order_status', text: 'Order status' },
+    { id: 'cancel_order', text: 'Cancel order' },
+    { id: 'return_request', text: 'Return request' },
+    { id: 'refund_status', text: 'Refund status' },
+    { id: 'shipping_info', text: 'Shipping info' },
+    { id: 'payment_issue', text: 'Payment issue' }
+  ];
+
+  // Update the handleSuggestionClick function
+  const handleSuggestionClick = (suggestion: { id: string; text: string }) => {
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      text: suggestion.text,
+      sender: 'user',
+      timestamp: new Date(),
+      status: 'sending',
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Update message status after sending
+    setTimeout(() => {
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id 
+          ? { ...msg, status: 'delivered' } 
+          : msg
+      ));
+    }, 1000);
+    
+    // Simulate agent typing and response
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      const response: Message = {
+        id: (Date.now() + 1).toString(),
+        text: `I'll help you with your ${suggestion.text.toLowerCase()}. How would you like to proceed?`,
+        sender: 'agent',
+        timestamp: new Date(),
+        avatar: agentAvatar,
+        status: 'sent'
+      };
+      setMessages(prev => [...prev, response]);
+      setLastReadTimestamp(new Date());
+      
+      setBotConversationStep(2);
+      
+      // Update original message status to read
+      setTimeout(() => {
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { ...msg, status: 'read' } 
+            : msg
+        ));
+      }, 1000);
+    }, 2000);
+  };
 
   return (
     <div style={getPositionStyles()} className="font-sans">
