@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ChatWidget } from '../src/components/ChatWidget';
+import ChatWidget from '../src/components/ChatWidget';
 import { MessageSquare, Users, BarChart2 } from 'lucide-react';
 
 interface FeatureToggleProps {
@@ -169,8 +169,8 @@ export default function Home() {
         offset={20}
         triggerButtonSize={60}
         headerText="Zephyr Support"
-        primaryColor="bg-blue-600"
-        textColor="text-white"
+        primaryColor="#0066FF"
+        textColor="#FFFFFF"
         showNotificationBadge={true}
         notificationCount={0}
         bubbleAnimation={true}
