@@ -1918,15 +1918,14 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                 
                 setMessages([greeting]);
               }}
-              className="w-full bg-black hover:bg-slate-700 px-4 py-3 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+              className="w-full bg-black px-4 py-3 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
             >
-              <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
               <div className="relative z-10 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MessageCirclePlus size={18} className="text-white" />
                   <span className="text-[14px] font-medium text-white">Ask a question</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-white group-hover:translate-x-0.5 transition-transform duration-500" />
+                <ChevronRight className="w-4 h-4 text-white" />
               </div>
             </button>
           </div>
@@ -2025,11 +2024,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                           <button
                             key={dept.id}
                             onClick={() => handleDepartmentSelect(dept.id)}
-                            className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                            className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
                           >
-                            <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
                             <div className="flex items-center gap-2 relative z-10">
-                              <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">
+                              <span className="text-[15px] text-white">
                                 {dept.id === 'billing' && '💳'}
                                 {dept.id === 'technical' && '🔧'}
                                 {dept.id === 'account' && '👤'}
@@ -2037,7 +2035,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                                 {dept.id === 'sales' && '💼'}
                                 {dept.id === 'product' && '💡'}
                               </span>
-                              <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">{dept.name}</span>
+                              <span className="text-[13px] font-medium text-white">{dept.name}</span>
                             </div>
                           </button>
                       ))}
@@ -2070,12 +2068,11 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                             setMessages(prev => [...prev, response]);
                           }, 1000);
                         }}
-                        className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                        className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
                       >
-                        <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
                         <div className="flex items-center gap-2 relative z-10">
-                          <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">🤝</span>
-                          <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">Chat with a human</span>
+                          <span className="text-[15px] text-white">🤝</span>
+                          <span className="text-[13px] font-medium text-white">Chat with a human</span>
                         </div>
                       </button>
                     </div>
@@ -2092,11 +2089,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                           <button
                             key={sub.id}
                             onClick={() => handleSubcategorySelect(sub.id)}
-                            className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                            className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
                           >
-                            <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
                             <div className="flex items-center gap-2 relative z-10">
-                              <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">
+                              <span className="text-[15px] text-white">
                                 {sub.id.includes('payment') && '💰'}
                                 {sub.id.includes('subscription') && '📅'}
                                 {sub.id.includes('refund') && '↩️'}
@@ -2107,7 +2103,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                                 {sub.id.includes('login') && '🔒'}
                                 {!sub.id.match(/(payment|subscription|refund|invoice|setup|error|access|login)/) && '📝'}
                               </span>
-                              <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">{sub.name}</span>
+                              <span className="text-[13px] font-medium text-white">{sub.name}</span>
                             </div>
                           </button>
                       ))}
@@ -2120,24 +2116,22 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
                       {!messages.some(msg => msg.text.toLowerCase().includes('chat with agent')) && (
                         <button
                           onClick={() => handleHumanSupportSelect(true)}
-                          className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                          className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
                         >
-                          <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
                           <div className="flex items-center gap-2 relative z-10">
-                            <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">👥</span>
-                            <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">Chat with an agent</span>
+                            <span className="text-[15px] text-white">👥</span>
+                            <span className="text-[13px] font-medium text-white">Chat with an agent</span>
                           </div>
                         </button>
                       )}
                       {!messages.some(msg => msg.text.toLowerCase().includes('view help guide')) && (
                         <button
                           onClick={() => handleSuggestionClick({ id: 'self_help', text: 'View help guide' })}
-                          className="bg-black hover:bg-slate-700 px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
+                          className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
                         >
-                          <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
                           <div className="flex items-center gap-2 relative z-10">
-                            <span className="text-[15px] text-white transition-colors duration-500 ease-in-out group-hover:text-white">📚</span>
-                            <span className="text-[13px] font-medium text-white transition-colors duration-500 ease-in-out group-hover:text-white">View help guide</span>
+                            <span className="text-[15px] text-white">📚</span>
+                            <span className="text-[13px] font-medium text-white">View help guide</span>
                           </div>
                         </button>
                       )}
@@ -2278,6 +2272,12 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           initial={false}
+          transition={{ 
+            type: "spring", 
+            stiffness: 400, 
+            damping: 25,
+            mass: 0.8
+          }}
           aria-label="Open chat"
           style={{
             position: 'absolute',
@@ -2315,7 +2315,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
             className="absolute bottom-[76px] right-0 w-full max-w-[400px] h-[700px] bg-white rounded-[16px] shadow-2xl flex flex-col sm:max-w-[400px] md:max-w-[400px] xs:bottom-0 xs:right-0 xs:w-full xs:h-[100vh] xs:rounded-none xs:max-h-[100vh]"
             style={{ 
               overflow: 'hidden',
-              marginBottom: '16px'
+              marginBottom: '16px',
+              willChange: 'transform, opacity',
+              backfaceVisibility: 'hidden',
+              transform: 'translateZ(0)'
             }}
           >
             {/* Pull to refresh indicator */}
