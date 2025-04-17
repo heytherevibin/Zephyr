@@ -1,111 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MessageSquare, Home, HelpCircle, MessageCircle, Volume2, Search, ChevronRight, Clock, Settings, Send, Smile, Paperclip, Image, ThumbsUp, Reply, Star, Copy, Check, CheckCheck, ArrowUp, MessageSquareText, BookOpen, Newspaper, MessageCirclePlus, MessageCircleX, MessageSquareDashed, MessageSquareOff, ArrowLeft } from 'lucide-react';
-
-interface Reaction {
-  emoji: string;
-  count: number;
-  users: string[];
-}
-
-interface FileAttachment {
-    id: string;
-    name: string;
-    type: string;
-    url: string;
-  previewUrl?: string;
-  size: number;
-}
-
-interface MessageThread {
-  id: string;
-  messages: Message[];
-}
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'agent';
-  timestamp: Date;
-  status?: 'sending' | 'sent' | 'delivered' | 'read';
-  avatar?: string;
-  reactions?: Reaction[];
-  attachments?: FileAttachment[];
-  threadId?: string;
-  isThreadReply?: boolean;
-  richText?: {
-    format: 'bold' | 'italic' | 'link' | 'code';
-    content: string;
-  }[];
-}
-
-interface QuickReply {
-  id: string;
-  text: string;
-  category: string;
-}
-
-interface SavedResponse {
-  id: string;
-  title: string;
-  content: string;
-  tags: string[];
-}
-
-interface HelpArticle {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  views: number;
-}
-
-interface NewsItem {
-  id: string;
-  title: string;
-  content: string;
-  date: Date;
-  category: string;
-  read: boolean;
-}
-
-interface ChatWidgetProps {
-  position?: 'bottom-right' | 'bottom-left';
-  offset?: number;
-  triggerButtonSize?: number;
-  headerText?: string;
-  primaryColor?: string;
-  textColor?: string;
-  showNotificationBadge?: boolean;
-  notificationCount?: number;
-  bubbleAnimation?: boolean;
-  mobileFullScreen?: boolean;
-  soundEnabled?: boolean;
-  darkMode?: boolean;
-  enableDepartmentRouting?: boolean;
-  enableAnalytics?: boolean;
-  enableCannedResponses?: boolean;
-  enableMultilingualSupport?: boolean;
-  userIdentity?: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  apiEndpoint?: string;
-  onMessageSend?: (message: string) => void;
-  onFileUpload?: (file: File) => void;
-  enableTypingPreview?: boolean;
-  quickReplies?: QuickReply[];
-  savedResponses?: SavedResponse[];
-  onArticleView?: (articleId: string) => void;
-  onNewsRead?: (newsId: string) => void;
-  helpArticles?: HelpArticle[];
-  newsItems?: NewsItem[];
-  showSatisfactionSurvey?: boolean;
-  companyName?: string;
-  agentName?: string;
-  agentAvatar?: string;
-}
+import { useChatStore } from '../store/chatStore';
+import type { ChatWidgetProps, Message, MessageThread, FileAttachment, HelpArticle, NewsItem, Reaction, QuickReply, SavedResponse } from './chat/types';
+import type { Conversation } from '../store/chatStore';
+import { TypingIndicator } from './chat/TypingIndicator';
+import { Tooltip } from './chat/Tooltip';
+import { LoadingSkeleton } from './chat/LoadingSkeleton';
+import { MessagesTab } from './chat/tabs/MessagesTab';
+import { HelpTab } from './chat/tabs/HelpTab';
+import { NewsTab } from './chat/tabs/NewsTab';
+import { HomeTab } from './chat/tabs/HomeTab';
+import { MessageList } from './chat/messages/MessageList';
+import { MessageInput } from './chat/messages/MessageInput';
+import { AttachmentPreview } from './chat/messages/AttachmentPreview';
+import { useSound } from './chat/hooks/useSound';
+import { CHAT_CONSTANTS } from './chat/constants';
+import { CHAT_STYLES, ANIMATIONS } from './chat/styles';
 
 const globalStyles = `
   /* Webkit scrollbar styles */
@@ -175,15 +86,6 @@ const globalStyles = `
   }
 `;
 
-// Add the TypingIndicator component near the top of the file after the interfaces
-const TypingIndicator = () => (
-  <div className="flex items-end gap-1 px-4 py-3 bg-gray-100 rounded-2xl w-fit">
-    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-  </div>
-);
-
 const ChatWidget: React.FC<ChatWidgetProps> = ({
   position = 'bottom-right',
   offset = 20,
@@ -218,10 +120,15 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
   agentAvatar,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { isEnabled: isSoundEnabled } = useSound({
+    enabled: soundEnabled,
+    soundUrl: CHAT_CONSTANTS.SOUND.NOTIFICATION_URL
+  });
   const [activeTab, setActiveTab] = useState<'home' | 'messages' | 'help' | 'news'>('home');
-  const [inputText, setInputText] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [threads, setThreads] = useState<MessageThread[]>([]);
@@ -248,6 +155,9 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTabTransitioning, setIsTabTransitioning] = useState(false);
+  const [botStep, setBotStep] = useState(0);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  const [needsHumanSupport, setNeedsHumanSupport] = useState<boolean | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -256,65 +166,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
   const startY = useRef(0);
   const currentY = useRef(0);
 
-  const [recentConversations, setRecentConversations] = useState<{
-    id: string;
-    title: string;
-    preview: string;
-    timestamp: Date;
-    avatar?: string;
-    unread: boolean;
-  }[]>([
-    {
-      id: '1',
-      title: 'Billing inquiry',
-      preview: "Thanks for reaching out! I've checked your account and can see the payment was processed successfully.",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      unread: false
-    },
-    {
-      id: '2',
-      title: 'Feature request',
-      preview: "That's a great suggestion! I'll pass this along to our product team for consideration.",
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-      unread: true
-    }
-  ]);
-
-  const [activeConversation, setActiveConversation] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<{
-    id: string;
-    title: string;
-    lastMessage: string;
-    timestamp: Date;
-    unread: boolean;
-    messages: Message[];
-  }[]>([
-    {
-      id: '1',
-      title: 'General Support',
-      lastMessage: "Hi there! How can I help you today?",
-      timestamp: new Date(),
-      unread: false,
-      messages: []
-    },
-    {
-      id: '2',
-      title: 'Technical Support',
-      lastMessage: "Could you provide more details about the issue?",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      unread: true,
-      messages: []
-    }
-  ]);
-
-  // Add state for showing department suggestions
-  const [showDepartmentSuggestions, setShowDepartmentSuggestions] = useState(false);
-  
-  // Add state for bot conversation flow
-  const [botConversationStep, setBotConversationStep] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [needsHumanSupport, setNeedsHumanSupport] = useState<boolean | null>(null);
+  const { recentConversations, addMessage } = useChatStore();
   
   // Add departments data
   const departments = [
@@ -359,10 +211,32 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     ]
   };
 
+  // Add bot flow steps
+  const botSteps = [
+    {
+      id: 'welcome',
+      message: "Hi! I'm here to help. What can I assist you with today?",
+      options: departments.map(dept => ({
+        id: dept.id,
+        text: `${dept.icon} ${dept.name}`,
+        description: dept.description
+      }))
+    },
+    {
+      id: 'department_selected',
+      message: "Great! I'll help you with that. Would you like to:",
+      options: [
+        { id: 'continue_bot', text: "Continue with AI Assistant", description: "Get instant help from our AI" },
+        { id: 'human_agent', text: "Talk to Human Agent", description: "Connect with a support agent" }
+      ]
+    }
+  ];
+
   // Group messages by date
   useEffect(() => {
     const grouped = messages.reduce((acc, message) => {
-      const date = message.timestamp.toDateString();
+      const timestamp = message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp);
+      const date = timestamp.toDateString();
       if (!acc[date]) {
         acc[date] = [];
       }
@@ -387,7 +261,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
   // Memoized message groups
   const groupedMessagesMemo = useMemo(() => {
     return messages.reduce((acc, message) => {
-      const date = message.timestamp.toDateString();
+      const timestamp = message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp);
+      const date = timestamp.toDateString();
       if (!acc[date]) {
         acc[date] = [];
       }
@@ -436,8 +311,9 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     zIndex: 9999,
     [position === 'bottom-right' ? 'right' : 'left']: offset,
     bottom: offset,
-    width: '100%',
-    maxWidth: '400px'
+    width: mobileFullScreen ? '100%' : '400px',
+    maxWidth: mobileFullScreen ? '100%' : '400px',
+    height: mobileFullScreen ? '100vh' : '700px'
   });
 
   useEffect(() => {
@@ -455,1059 +331,246 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     if (messagesContainerRef.current && activeTab === 'messages') {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
-  }, [messages, inputText, activeTab]);
+  }, [messages, inputValue, activeTab]);
 
-  // Update the handleSendMessage function to handle department selection
-  const handleSendMessage = useCallback(() => {
-    if (!inputText.trim() && selectedFiles.length === 0) return;
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText,
-      sender: 'user',
-      timestamp: new Date(),
-      status: 'sending',
-      attachments: selectedFiles,
-      threadId: activeThread || undefined
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-    setInputText('');
-    setSelectedFiles([]);
-    
-    // Reset textarea height to minimum after sending
-    const textarea = document.querySelector('textarea');
-    if (textarea) {
-      textarea.style.height = '52px';
-    }
-    
-    onMessageSend?.(inputText);
-
-    // Update message status after sending
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === newMessage.id 
-          ? { ...msg, status: 'delivered' } 
-          : msg
-      ));
-    }, 1000);
-
-    // Simulate agent typing and response
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const response: Message = {
-        id: (Date.now() + 1).toString(),
-        text: "Thanks for your message! I'll get back to you shortly.",
-        sender: 'agent',
-        timestamp: new Date(),
-        avatar: agentAvatar,
-        status: 'sent'
-      };
-      setMessages(prev => [...prev, response]);
-      setLastReadTimestamp(new Date());
-      
-      // Update original message status to read
-      setTimeout(() => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id 
-            ? { ...msg, status: 'read' } 
-            : msg
-        ));
-      }, 1000);
-    }, 2000);
-  }, [inputText, selectedFiles, activeThread, agentAvatar, onMessageSend]);
-
-  // Add function to handle department selection
+  // Handle department selection
   const handleDepartmentSelect = (departmentId: string) => {
+    setSelectedDepartment(departmentId);
+    setBotStep(1);
+    
     const department = departments.find(d => d.id === departmentId);
-    if (!department) return;
-    
-    setSelectedCategory(departmentId);
-    setBotConversationStep(1);
-    
-    // Create a new message with the department selection
-    const newMessage: Message = {
+    const message: Message = {
       id: Date.now().toString(),
-      text: `I need help with ${department.name}`,
-      sender: 'user',
+      text: `I'll help you with ${department?.name.toLowerCase()} related questions.`,
+      sender: 'bot',
       timestamp: new Date(),
-      status: 'sending',
+        status: 'sent'
+      };
+    setMessages(prev => [...prev, message]);
+  };
+
+  // Handle support type selection
+  const handleSupportTypeSelect = (type: 'continue_bot' | 'human_agent') => {
+    if (type === 'human_agent') {
+      setNeedsHumanSupport(true);
+      const message: Message = {
+      id: Date.now().toString(),
+        text: "I'll connect you with a human agent. Please wait a moment...",
+        sender: 'bot',
+      timestamp: new Date(),
+        status: 'sent'
     };
+      setMessages(prev => [...prev, message]);
     
-    setMessages(prev => [...prev, newMessage]);
-    
-    // Update message status after sending
+      // Simulate agent connection
     setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === newMessage.id 
-          ? { ...msg, status: 'delivered' } 
-          : msg
-      ));
-    }, 1000);
-    
-    // Simulate agent typing and response
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const response: Message = {
+        const agentMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: `I understand you need help with ${department.name.toLowerCase()}. Could you please specify what you need assistance with?`,
+          text: `Hi! I'm ${agentName}, how can I help you today?`,
         sender: 'agent',
         timestamp: new Date(),
         avatar: agentAvatar,
         status: 'sent'
       };
-      setMessages(prev => [...prev, response]);
-      setLastReadTimestamp(new Date());
-      
-      // Update original message status to read
-      setTimeout(() => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id 
-            ? { ...msg, status: 'read' } 
-            : msg
-        ));
-      }, 1000);
+        setMessages(prev => [...prev, agentMessage]);
     }, 2000);
-  };
-  
-  // Add function to handle subcategory selection
-  const handleSubcategorySelect = (subcategoryId: string) => {
-    if (!selectedCategory) return;
-    
-    const subcategory = subcategories[selectedCategory as keyof typeof subcategories].find(s => s.id === subcategoryId);
-    if (!subcategory) return;
-    
-    setSelectedSubcategory(subcategoryId);
-    setBotConversationStep(2);
-    
-    // Create a new message with the subcategory selection
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: `I need help with ${subcategory.name}`,
-      sender: 'user',
-      timestamp: new Date(),
-      status: 'sending',
-    };
-    
-    setMessages(prev => [...prev, newMessage]);
-    
-    // Update message status after sending
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === newMessage.id 
-          ? { ...msg, status: 'delivered' } 
-          : msg
-      ));
-    }, 1000);
-    
-    // Simulate agent typing and response
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const response: Message = {
-        id: (Date.now() + 1).toString(),
-        text: `I've found some helpful information about ${subcategory.name.toLowerCase()}. Would you like to speak with a human representative for more personalized assistance?`,
-        sender: 'agent',
-        timestamp: new Date(),
-        avatar: agentAvatar,
-        status: 'sent'
-      };
-      setMessages(prev => [...prev, response]);
-      setLastReadTimestamp(new Date());
-      
-      // Update original message status to read
-      setTimeout(() => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id 
-            ? { ...msg, status: 'read' } 
-            : msg
-        ));
-      }, 1000);
-    }, 2000);
-  };
-  
-  // Add function to handle human support selection
-  const handleHumanSupportSelect = (needsSupport: boolean) => {
-    setNeedsHumanSupport(needsSupport);
-    
-    if (needsSupport) {
-      setBotConversationStep(3);
-      setShowDepartmentSuggestions(false);
-      
-      // Create a new message with the human support request
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        text: "Yes, I'd like to speak with a human representative",
-        sender: 'user',
-        timestamp: new Date(),
-        status: 'sending',
-      };
-      
-      setMessages(prev => [...prev, newMessage]);
-      
-      // Update message status after sending
-      setTimeout(() => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id 
-            ? { ...msg, status: 'delivered' } 
-            : msg
-        ));
-      }, 1000);
-      
-      // Simulate agent typing and response
-      setIsTyping(true);
-      setTimeout(() => {
-        setIsTyping(false);
-        const response: Message = {
-          id: (Date.now() + 1).toString(),
-          text: "I've connected you with a human representative. They'll be with you shortly. In the meantime, feel free to provide any additional details about your issue.",
-          sender: 'agent',
-          timestamp: new Date(),
-          avatar: agentAvatar,
-          status: 'sent'
-        };
-        setMessages(prev => [...prev, response]);
-        setLastReadTimestamp(new Date());
-        
-        // Update original message status to read
-        setTimeout(() => {
-          setMessages(prev => prev.map(msg => 
-            msg.id === newMessage.id 
-              ? { ...msg, status: 'read' } 
-              : msg
-          ));
-        }, 1000);
-      }, 2000);
     } else {
-      // User doesn't need human support, show typing area
-      setShowDepartmentSuggestions(false);
-      
-      // Create a new message with the no human support request
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        text: "No, I don't need human support",
-        sender: 'user',
-        timestamp: new Date(),
-        status: 'sending',
+      setNeedsHumanSupport(false);
+      const message: Message = {
+      id: Date.now().toString(),
+        text: "I'll continue helping you. What specific question do you have?",
+        sender: 'bot',
+      timestamp: new Date(),
+        status: 'sent'
       };
-      
-      setMessages(prev => [...prev, newMessage]);
-      
-      // Update message status after sending
-      setTimeout(() => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id 
-            ? { ...msg, status: 'delivered' } 
-            : msg
-        ));
-      }, 1000);
-      
-      // Simulate agent typing and response
-      setIsTyping(true);
-      setTimeout(() => {
-        setIsTyping(false);
-        const response: Message = {
-          id: (Date.now() + 1).toString(),
-          text: "I understand. Is there anything else I can help you with?",
-          sender: 'agent',
-          timestamp: new Date(),
-          avatar: agentAvatar,
-          status: 'sent'
-        };
-        setMessages(prev => [...prev, response]);
-        setLastReadTimestamp(new Date());
-        
-        // Update original message status to read
-        setTimeout(() => {
-          setMessages(prev => prev.map(msg => 
-            msg.id === newMessage.id 
-              ? { ...msg, status: 'read' } 
-              : msg
-          ));
-        }, 1000);
-      }, 2000);
+      setMessages(prev => [...prev, message]);
     }
   };
 
-  // Enhanced file upload
-  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
+  // Update the handleSendMessage function
+  const handleSendMessage = (text: string | { format: string; content: string }) => {
+    const messageText = typeof text === 'string' ? text : text.content;
+    if (!messageText.trim() && selectedFiles.length === 0) return;
 
-    try {
-      const newFiles: FileAttachment[] = await Promise.all(
-        Array.from(files).map(async (file) => {
-          // Create object URL for preview
-          const previewUrl = file.type.startsWith('image/') 
-            ? URL.createObjectURL(file)
-            : undefined;
-
-          return {
-            id: Date.now().toString(),
-            name: file.name,
-            type: file.type,
-            url: URL.createObjectURL(file),
-            previewUrl,
-            size: file.size
-          };
-        })
-      );
-
-      setSelectedFiles(prev => [...prev, ...newFiles]);
-      if (onFileUpload && files[0]) {
-        onFileUpload(files[0]);
-      }
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      // Here you could add proper error handling UI
-    }
-  }, [onFileUpload]);
-
-  // Cleanup object URLs on unmount
-  useEffect(() => {
-    return () => {
-      selectedFiles.forEach(file => {
-        if (file.previewUrl) {
-          URL.revokeObjectURL(file.previewUrl);
-        }
-        if (file.url) {
-          URL.revokeObjectURL(file.url);
-        }
-      });
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      text: messageText,
+      sender: 'user',
+      timestamp: new Date(),
+      status: 'sending',
+      attachments: selectedFiles.map(file => ({
+        id: file.id,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: file.url,
+        status: 'uploaded'
+      }))
     };
-  }, [selectedFiles]);
 
-  const handleReaction = (messageId: string, emoji: string) => {
-    setMessages(prev => prev.map(message => {
-      if (message.id === messageId) {
-        const existingReaction = message.reactions?.find(r => r.emoji === emoji);
-        const reactions = message.reactions || [];
-        
-        if (existingReaction) {
-          return {
-            ...message,
-            reactions: reactions.map(r => 
-              r.emoji === emoji 
-                ? { ...r, count: r.count + 1, users: [...r.users, 'user'] }
-                : r
-            )
+    // Update local state immediately
+    setMessages(prev => [...prev, newMessage]);
+
+    // Add message to store
+    const store = useChatStore.getState();
+    store.addMessage(newMessage);
+
+    // Simulate message delivery
+    setTimeout(() => {
+      store.updateMessageStatus(newMessage.id, 'sent');
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id ? { ...msg, status: 'sent' } : msg
+      ));
+    }, 1000);
+
+    // Simulate message being delivered
+    setTimeout(() => {
+      store.updateMessageStatus(newMessage.id, 'delivered');
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id ? { ...msg, status: 'delivered' } : msg
+      ));
+    }, 2000);
+
+    // Simulate message being read and trigger bot response
+    setTimeout(() => {
+      store.updateMessageStatus(newMessage.id, 'read');
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id ? { ...msg, status: 'read' } : msg
+      ));
+
+      // Show typing indicator
+      setIsTyping(true);
+
+      // Simulate bot response after a delay
+      setTimeout(() => {
+        setIsTyping(false);
+
+        // Generate bot response based on user message
+        let botResponse: Message;
+        if (needsHumanSupport) {
+          botResponse = {
+            id: Date.now().toString(),
+            text: "I've notified our support team. They'll get back to you as soon as possible. In the meantime, is there anything specific you'd like to know?",
+            sender: 'bot',
+            timestamp: new Date(),
+            status: 'sent'
           };
         } else {
-          return {
-            ...message,
-            reactions: [...reactions, { emoji, count: 1, users: ['user'] }]
-          };
-        }
-      }
-      return message;
-    }));
-  };
-
-  const handleThreadReply = (messageId: string) => {
-    const message = messages.find(m => m.id === messageId);
-    if (!message) return;
-
-    if (message.threadId) {
-      setActiveThread(message.threadId);
-    } else {
-      const newThread: MessageThread = {
-        id: Date.now().toString(),
-        messages: [message]
-      };
-      setThreads(prev => [...prev, newThread]);
-      setActiveThread(newThread.id);
-    }
-  };
-
-  const renderMessage = (message: Message) => (
-    <div
-      key={message.id}
-      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} group mb-1`}
-    >
-      <div className="flex flex-col">
-        <div className={`max-w-[240px] ${message.sender === 'user' ? 'bg-[#000000] text-white' : 'bg-gray-100 text-gray-900'} rounded-[16px] px-3 py-2 relative`}>
-          <p className="text-[14px] leading-[1.4]">{message.text}</p>
-
-          {/* Attachments */}
-          {message.attachments && message.attachments.length > 0 && (
-            <div className="mt-2 space-y-1.5">
-              {message.attachments.map(file => (
-                <div key={file.id} className="rounded-lg overflow-hidden">
-                  {file.type.startsWith('image/') && file.previewUrl ? (
-                    <img src={file.previewUrl} alt={file.name} className="max-h-40 w-auto rounded" />
-                  ) : (
-                    <div className="bg-black/5 p-2 rounded-lg flex items-center gap-2">
-                      <Paperclip className="w-3.5 h-3.5" />
-                      <span className="text-[13px] truncate">{file.name}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Quick Actions */}
-          <div className="absolute top-1 right-0 translate-x-full pl-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-            <button
-              onClick={() => handleReaction(message.id, '👍')}
-              className="p-1 hover:bg-gray-100 rounded-full"
-            >
-              <ThumbsUp size={12} />
-            </button>
-            <button
-              onClick={() => handleThreadReply(message.id)}
-              className="p-1 hover:bg-gray-100 rounded-full"
-            >
-              <Reply size={12} />
-            </button>
-          </div>
-        </div>
-        
-        {/* Message Meta - Outside the message bubble */}
-        <div className={`flex items-center gap-1.5 mt-1 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-          <span className="text-[11px] text-gray-500">
-            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </span>
-          {message.sender === 'user' && message.status && (
-            <span className="text-[11px] text-gray-500 flex items-center">
-              {message.status === 'read' && (
-                <CheckCheck size={12} className="text-black" />
-              )}
-              {message.status === 'delivered' && (
-                <Check size={12} />
-              )}
-              {message.status === 'sending' && (
-                <Clock size={12} className="animate-pulse" />
-              )}
-            </span>
-          )}
-          </div>
-        </div>
-    </div>
-  );
-
-  const renderMessageGroup = (date: string, messages: Message[]) => (
-    <div key={date} className="space-y-3">
-      <div className="flex items-center justify-center">
-        <div className="bg-gray-100 text-gray-600 text-[11px] px-2 py-0.5 rounded-full">
-          {new Date(date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
-        </div>
-      </div>
-      {messages.map(renderMessage)}
-    </div>
-  );
-
-  const renderHelpTab = () => (
-    <div className="flex flex-col h-full">
-      <div className="relative bg-gradient-to-b from-[#1F1F1F] via-[#000000] to-white text-white p-6 pb-12">
-        <div className="pt-8 pb-4">
-          <h1 className="text-[28px] font-semibold leading-tight mb-2">Help Center</h1>
-          <p className="text-[15px] text-white/80">
-            Search our knowledge base or browse popular topics
-          </p>
-        </div>
-        
-        <div className="relative mt-4">
-            <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search help articles..."
-            className="w-full h-11 bg-white text-gray-900 placeholder-gray-500 rounded-xl py-2.5 pl-11 pr-4 outline-none transition-all text-[15px] shadow-md"
-          />
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-500" />
-        </div>
-        </div>
-        
-      <div className="flex-1 overflow-y-auto -mt-6">
-        <div className="p-6">
-          {isSearching ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
-            </div>
-          ) : searchQuery ? (
-            <div className="space-y-4">
-              <h2 className="text-[16px] font-semibold text-gray-900">
-                Search Results ({searchResults.articles.length})
-              </h2>
-              {searchResults.articles.map((article) => (
-        <button
-                  key={article.id}
-                  onClick={() => handleArticleClick(article.id)}
-                  className="w-full bg-gray-50 hover:bg-gray-100 p-4 rounded-2xl text-left transition-all"
-                >
-                  <h3 className="text-[15px] font-medium text-gray-900 mb-1">{article.title}</h3>
-                  <p className="text-[14px] text-gray-600 line-clamp-2">{article.content}</p>
-                  <div className="flex items-center gap-2 mt-2 text-gray-500">
-                    <span className="text-[13px]">{article.category}</span>
-                    <span className="text-[13px]">•</span>
-                    <span className="text-[13px]">{article.views} views</span>
-                  </div>
-        </button>
-              ))}
-            </div>
-          ) : (
-            <>
-              {/* Categories */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between px-1 mb-3">
-                  <h2 className="text-[16px] font-semibold text-gray-900">Categories</h2>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Getting Started', 'Account & Billing', 'Features', 'Troubleshooting'].map((category) => (
-                    <button
-                      key={category}
-                      className="bg-white hover:bg-gray-50 p-4 rounded-2xl text-left border border-gray-200 group relative overflow-hidden transition-all duration-300"
-                    >
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-2">
-                          <BookOpen className="w-5 h-5 text-gray-900" />
-                          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:translate-x-0.5 transition-transform duration-500" />
-                        </div>
-                        <h3 className="text-[15px] font-medium text-gray-900 transition-colors duration-500 ease-in-out mb-1">{category}</h3>
-                        <p className="text-[14px] text-gray-600 transition-colors duration-500 ease-in-out">View articles</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Popular Articles */}
-              <div>
-                <h2 className="text-[16px] font-semibold text-gray-900 mb-4">Popular articles</h2>
-                <div className="space-y-2">
-                  {helpArticles.slice(0, 5).map((article) => (
-                    <button
-                      key={article.id}
-                      onClick={() => handleArticleClick(article.id)}
-                      className="w-full group bg-gray-50 hover:bg-gray-100 px-4 py-3 rounded-xl text-left transition-all"
-                    >
-                      <h3 className="text-[15px] text-gray-900">{article.title}</h3>
-                      <div className="flex items-center gap-2 mt-1 text-gray-500">
-                        <span className="text-[13px]">{article.category}</span>
-                        <span className="text-[13px]">•</span>
-                        <span className="text-[13px]">{article.views} views</span>
-                </div>
-                    </button>
-                  ))}
-                  </div>
-                </div>
-            </>
-              )}
-            </div>
-        </div>
-        </div>
-  );
-
-  const renderNewsTab = () => (
-    <>
-      <div className="relative bg-gradient-to-b from-[#1F1F1F] via-[#000000] to-white text-white p-6 pb-12">
-        <div className="pt-8 pb-4">
-          <h1 className="text-[28px] font-semibold leading-tight mb-2">What's New</h1>
-          <p className="text-[15px] text-white/80">
-            Stay up to date with our latest updates and features
-          </p>
-        </div>
-
-        <div className="relative mt-4">
-        <input
-          type="text"
-          value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search updates..."
-            className="w-full h-11 bg-white text-gray-900 placeholder-gray-500 rounded-xl py-2.5 pl-11 pr-4 outline-none transition-all text-[15px] shadow-md"
-          />
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-500" />
-        </div>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-6">
-          {isSearching ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
-            </div>
-          ) : searchQuery ? (
-            <div className="space-y-4">
-              <h2 className="text-[16px] font-semibold text-gray-900">
-                Search Results ({searchResults.news.length})
-              </h2>
-              {searchResults.news.map((item) => (
-          <button
-                  key={item.id}
-                  onClick={() => handleNewsClick(item.id)}
-                  className="w-full bg-gray-50 hover:bg-gray-100 p-4 rounded-2xl text-left transition-all"
-                >
-                  <h3 className="text-[15px] font-medium text-gray-900 mb-1">{item.title}</h3>
-                  <p className="text-[14px] text-gray-600 line-clamp-2">{item.content}</p>
-                  <div className="flex items-center gap-2 mt-2 text-gray-500">
-                    <span className="text-[13px]">{item.category}</span>
-                    <span className="text-[13px]">•</span>
-                    <span className="text-[13px]">
-                      {item.date.toLocaleDateString(undefined, { 
-                        month: 'short', 
-                        day: 'numeric' 
-                      })}
-                    </span>
-                  </div>
-          </button>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {newsItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleNewsClick(item.id)}
-                  className="w-full bg-gray-50 hover:bg-gray-100 p-4 rounded-2xl text-left transition-all group"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0">
-                      <Volume2 className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-[15px] text-gray-900">{item.title}</p>
-                        {!item.read && (
-                          <span className="w-2 h-2 bg-black rounded-full flex-shrink-0" />
-                        )}
-                      </div>
-                      <p className="text-[14px] text-gray-600 line-clamp-2">{item.content}</p>
-                      <div className="flex items-center gap-2 mt-2 text-gray-500">
-                        <span className="text-[13px]">{item.category}</span>
-                        <span className="text-[13px]">•</span>
-                        <span className="text-[13px]">
-                          {item.date.toLocaleDateString(undefined, { 
-                            month: 'short', 
-                            day: 'numeric' 
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-        
-  const renderHomeTab = () => (
-    <>
-      {isHomeLoading ? (
-        <div className="flex flex-col h-full bg-white">
-          <div className="flex-1 flex items-center justify-center">
-            <motion.div 
-              className="relative"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-            >
-              {/* Background track with gradient */}
-              <motion.div 
-                className="w-10 h-10 rounded-full bg-gradient-to-br from-[#000000]/10 to-[#1A1A1A]/5"
-                animate={{ 
-                  scale: [1, 1.05, 1],
-                  opacity: [0.3, 0.5, 0.3]
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              />
-              {/* Spinning track */}
-              <motion.div 
-                className="absolute top-0 left-0 w-10 h-10 rounded-full border-[1.5px] border-[#000000] border-t-transparent"
-                animate={{ rotate: 360 }}
-                transition={{
-                  duration: 1,
-                  repeat: Infinity,
-                  ease: "linear"
-                }}
-                style={{ 
-                  boxShadow: '0 0 8px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-            </motion.div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col h-full">
-          <div className="relative bg-gradient-to-b from-[#1F1F1F] via-[#000000] to-white text-white p-6">
-            <div className="pt-8 pb-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-                  <MessageSquare className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-[28px] font-semibold leading-tight">Hi there 👋</h1>
-                  <p className="text-[15px] text-white/80 font-normal">We typically reply within an hour</p>
-                </div>
-              </div>
-              <p className="text-[16px] text-white/90 leading-relaxed font-normal">
-                Ask us anything, or browse through our most popular topics below.
-              </p>
-            </div>
-            
-            <div className="relative mt-4">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                placeholder="Search our help articles..."
-                className="w-full h-11 bg-white text-gray-900 placeholder-gray-500 rounded-xl py-2.5 pl-11 pr-4 outline-none transition-all text-[15px] shadow-md"
-              />
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-500" />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            <div className="px-6 py-6">
-              {/* Recent Conversations */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-[16px] font-semibold text-gray-900">Recent conversations</h2>
-          <button 
-                    onClick={() => setActiveTab('messages')}
-                    className="text-[14px] text-[#000000] hover:text-gray-800 font-medium"
-          >
-                    View all
-          </button>
-                </div>
-                <div className="space-y-2">
-                  {recentConversations.map((conversation) => (
-                    <button 
-                      key={conversation.id}
-                      onClick={() => {
-                        setActiveTab('messages');
-                        // You could also set the active conversation here if implementing conversation switching
-                      }}
-                      className="w-full bg-gray-50 hover:bg-gray-100 p-4 rounded-2xl text-left transition-all group"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0">
-                          {conversation.avatar ? (
-                            <img src={conversation.avatar} alt="" className="w-full h-full rounded-full object-cover" />
-                          ) : (
-                            <span className="text-white font-medium text-[15px]">
-                              {conversation.title.charAt(0)}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="font-medium text-[15px] text-gray-900">{conversation.title}</p>
-                            {conversation.unread && (
-                              <span className="w-2 h-2 bg-black rounded-full flex-shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-[14px] text-gray-600 line-clamp-2">{conversation.preview}</p>
-                          <div className="flex items-center gap-2 mt-2 text-gray-500">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span className="text-[13px]">
-                              {formatTimeAgo(conversation.timestamp)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quick Actions */}
-              <div className="mb-8">
-                <h2 className="text-[16px] font-semibold text-gray-900 mb-4">Quick actions</h2>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { 
-                      title: 'Start new', 
-                      desc: 'Send us a message', 
-                      icon: MessageSquare, 
-                      action: () => {
-                        setActiveTab('messages');
-                        const newConversation = {
-                          id: Date.now().toString(),
-                          title: 'New Conversation',
-                          lastMessage: '',
-                          timestamp: new Date(),
-                          unread: false,
-                          messages: []
-                        };
-                        setConversations(prev => [newConversation, ...prev]);
-                        setActiveConversation(newConversation.id);
-                        setNeedsHumanSupport(true);
-                        setBotConversationStep(3);
-                        
-                        const greeting: Message = {
-                          id: Date.now().toString(),
-                          text: "Hi there! 👋 How can I help you today?",
-                          sender: 'agent',
-                          timestamp: new Date(),
-                          avatar: agentAvatar,
-                          status: 'sent'
-                        };
-                        
-                        setMessages([greeting]);
-                      },
-                      primary: true
-                    },
-                    { 
-                      title: 'Help Center', 
-                      desc: 'Search articles', 
-                      icon: HelpCircle,
-                      action: () => setActiveTab('help')
-                    },
-                    { 
-                      title: 'Product News', 
-                      desc: 'Latest updates', 
-                      icon: Volume2,
-                      action: () => setActiveTab('news'),
-                      badge: newsItems.filter(item => !item.read).length
-                    },
-                    { 
-                      title: 'Settings', 
-                      desc: 'Preferences', 
-                      icon: Settings,
-                      action: () => {
-                        console.log('Settings clicked');
-                      }
-                    }
-                  ].map((action) => (
-                    <button 
-                      key={action.title}
-                      onClick={action.action}
-                      className="bg-gray-50 hover:bg-gray-100 px-4 py-3 rounded-2xl text-left transition-all group"
-                    >
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-2">
-                          <action.icon className="w-5 h-5 text-gray-900" />
-                          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:translate-x-0.5 transition-transform duration-500" />
-                        </div>
-                        <p className="font-medium text-[15px] text-gray-900">
-                          {action.title}
-                        </p>
-                        <p className="text-[14px] text-gray-600 mt-0.5">{action.desc}</p>
-                        {action.badge && (
-                          <span className="absolute top-3 right-3 bg-black text-white text-[12px] w-5 h-5 rounded-full flex items-center justify-center">
-                            {action.badge}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Help Articles */}
-              <div>
-                <h2 className="text-[16px] font-semibold text-gray-900 mb-4">Popular articles</h2>
-                <div className="space-y-2">
-                  {helpArticles.slice(0, 4).map((article) => (
-                    <button 
-                      key={article.id}
-                      onClick={() => {
-                        setActiveTab('help');
-                        handleArticleClick(article.id);
-                      }}
-                      className="w-full bg-gray-50 hover:bg-gray-100 px-4 py-3 rounded-2xl text-left transition-all group"
-                    >
-                      <div className="relative z-10 flex items-center justify-between">
-                        <div className="min-w-0">
-                          <p className="text-[15px] text-gray-900 truncate">{article.title}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[13px] text-gray-600">{article.category}</span>
-                            <span className="text-[13px] text-gray-600">•</span>
-                            <span className="text-[13px] text-gray-600">{article.views} views</span>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-600 group-hover:translate-x-0.5 transition-transform duration-500 flex-shrink-0 ml-3" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Categories */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between px-1 mb-3">
-                  <h2 className="text-[16px] font-semibold text-gray-900">Categories</h2>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Getting Started', 'Account & Billing', 'Features', 'Troubleshooting'].map((category) => (
-                    <button
-                      key={category}
-                      className="bg-white hover:bg-gray-50 p-4 rounded-2xl text-left border border-gray-200 group relative overflow-hidden transition-all duration-300"
-                    >
-                      <div className="relative z-10">
-                        <h3 className="text-[15px] font-medium text-gray-900 transition-colors duration-500 ease-in-out mb-1">{category}</h3>
-                        <div className="flex items-center text-gray-600">
-                          <span className="text-[14px] transition-colors duration-500 ease-in-out">View articles</span>
-                          <ChevronRight className="w-4 h-4 ml-1 text-gray-600 group-hover:translate-x-0.5 transition-transform duration-500" />
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Search Results */}
-              {searchQuery && (
-                <div className="space-y-4">
-                  {searchResults.articles.map((article) => (
-                    <button
-                      key={article.id}
-                      onClick={() => handleArticleClick(article.id)}
-                      className="w-full bg-black hover:bg-slate-700 p-4 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out"></div>
-                      <div className="relative z-10">
-                        <h3 className="text-[15px] font-medium text-white transition-colors duration-500 ease-in-out mb-1">{article.title}</h3>
-                        <p className="text-[14px] text-white/80 transition-colors duration-500 ease-in-out line-clamp-2">{article.content}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-[13px] text-white/80 transition-colors duration-500 ease-in-out">{article.category}</span>
-                          <span className="text-[13px] text-white/80">•</span>
-                          <span className="text-[13px] text-white/80 transition-colors duration-500 ease-in-out">{article.views} views</span>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* News Items */}
-              <div className="space-y-3">
-                {newsItems.slice(0, 2).map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNewsClick(item.id)}
-                    className="w-full bg-gray-50 hover:bg-gray-100 p-4 rounded-2xl text-left transition-all group"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0">
-                        <Volume2 className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="font-medium text-[15px] text-gray-900">{item.title}</p>
-                          {!item.read && (
-                            <span className="w-2 h-2 bg-black rounded-full flex-shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-[14px] text-gray-600 line-clamp-2">{item.content}</p>
-                        <div className="flex items-center gap-2 mt-2 text-gray-500">
-                          <span className="text-[13px]">{item.category}</span>
-                          <span className="text-[13px]">•</span>
-                          <span className="text-[13px]">
-                            {item.date.toLocaleDateString(undefined, { 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-
-  // Helper function to format timestamps
-  const formatTimeAgo = (date: Date) => {
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    const diffInMinutes = Math.floor(diffInSeconds / 60);
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    const diffInDays = Math.floor(diffInHours / 24);
-
-    if (diffInDays > 0) {
-      return `${diffInDays} day${diffInDays === 1 ? '' : 's'} ago`;
-    } else if (diffInHours > 0) {
-      return `${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
-    } else if (diffInMinutes > 0) {
-      return `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`;
-    } else {
-      return 'Just now';
-    }
-  };
-
-  // Update the handleTextareaResize function
-  const handleTextareaResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const textarea = e.target;
-    
-    // Reset height to auto first to get the correct scrollHeight
-    textarea.style.height = 'auto';
-    
-    // Calculate new height with a minimum of 52px and maximum of 150px
-    const newHeight = Math.min(Math.max(textarea.scrollHeight, 52), 150);
-    textarea.style.height = `${newHeight}px`;
-    
-    // Only scroll the messages container if we're in the messages tab
-    if (activeTab === 'messages') {
-      const messagesContainer = document.querySelector('.messages-container');
-      if (messagesContainer) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      }
-    }
-  };
-
-  // Add effect to handle home tab loading with progress
-  useEffect(() => {
-    if (activeTab === 'home' && !hasHomeLoaded) {
-      setIsHomeLoading(true);
-      setLoadingProgress(0);
-      
-      const duration = 2000; // 2 seconds total
-      const interval = 20; // Update every 20ms
-      const steps = duration / interval;
-      const increment = 100 / steps;
-      
-      const progressTimer = setInterval(() => {
-        setLoadingProgress(prev => {
-          const next = Math.min(prev + increment, 100);
-          if (next === 100) {
-            clearInterval(progressTimer);
-      setTimeout(() => {
-              setIsHomeLoading(false);
-              setHasHomeLoaded(true);
-            }, 200); // Small delay before hiding
+          // Default bot responses based on common patterns
+          if (messageText.toLowerCase().includes('hello') || messageText.toLowerCase().includes('hi')) {
+            botResponse = {
+              id: Date.now().toString(),
+              text: "Hello! How can I assist you today?",
+              sender: 'bot',
+              timestamp: new Date(),
+              status: 'sent'
+            };
+          } else if (messageText.toLowerCase().includes('help')) {
+            botResponse = {
+              id: Date.now().toString(),
+              text: "I'm here to help! Could you please specify what you need assistance with?",
+              sender: 'bot',
+              timestamp: new Date(),
+              status: 'sent'
+            };
+          } else if (messageText.toLowerCase().includes('thank')) {
+            botResponse = {
+              id: Date.now().toString(),
+              text: "You're welcome! Is there anything else you need help with?",
+              sender: 'bot',
+              timestamp: new Date(),
+              status: 'sent'
+            };
+          } else {
+            botResponse = {
+              id: Date.now().toString(),
+              text: "I understand. Could you please provide more details about your request so I can better assist you?",
+              sender: 'bot',
+              timestamp: new Date(),
+              status: 'sent'
+            };
           }
-          return next;
-        });
-      }, interval);
+        }
 
-      return () => clearInterval(progressTimer);
+        // Add bot response to messages and store
+        setMessages(prev => [...prev, botResponse]);
+        store.addMessage(botResponse);
+      }, 1500); // Delay before bot responds
+    }, 3000);
+
+    // Clear input
+    setInputValue('');
+    setSelectedFiles([]);
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const newAttachments: FileAttachment[] = files.map(file => ({
+      id: Math.random().toString(36).substring(7),
+            name: file.name,
+            type: file.type,
+      size: file.size,
+            url: URL.createObjectURL(file),
+      status: 'uploading'
+    }));
+
+    setSelectedFiles(prev => [...prev, ...newAttachments]);
+
+    // Simulate file upload
+    for (const attachment of newAttachments) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSelectedFiles(prev => 
+        prev.map(f => f.id === attachment.id 
+          ? { ...f, status: 'uploaded' }
+          : f
+        )
+      );
     }
-  }, [activeTab, hasHomeLoaded]);
+  };
 
-  // Reset loading state when widget is closed
-  useEffect(() => {
-    if (!isOpen) {
-      setHasHomeLoaded(false);
-      setIsHomeLoading(true);
-      setLoadingProgress(0);
+  const handleRemoveFile = (fileId: string) => {
+    setSelectedFiles(prev => {
+      const fileToRemove = prev.find(f => f.id === fileId);
+      if (fileToRemove?.url) URL.revokeObjectURL(fileToRemove.url);
+      return prev.filter(f => f.id !== fileId);
+    });
+  };
+
+  const handleFileUpload = (file: File) => {
+    if (!onFileUpload) return;
+    onFileUpload(file);
+  };
+
+  // Update tab change handler with simpler logic
+  const handleTabChange = (tab: 'home' | 'messages' | 'help' | 'news') => {
+    if (activeTab === tab) return;
+    
+    // Set new tab immediately
+    setActiveTab(tab);
+    
+    // Reset states based on tab
+    if (tab === 'messages') {
+      setShowEmojiPicker(false);
+      setShowQuickReplies(false);
+      setShowSavedResponses(false);
+    } else if (tab === 'help') {
+      setSearchQuery('');
+      setSearchResults({ messages: [], articles: [], news: [] });
     }
-  }, [isOpen]);
+  };
 
-  useEffect(() => {
-    const styleTag = document.createElement('style');
-    styleTag.textContent = globalStyles;
-    document.head.appendChild(styleTag);
-
-    return () => {
-      document.head.removeChild(styleTag);
-    };
-    }, []);
+  // Add function to handle close button click
+  const handleCloseButtonClick = () => {
+    if (activeTab === 'messages') {
+      // Return to home tab instead of closing
+      setActiveTab('home');
+    } else {
+      // Close the widget for other tabs
+      setIsOpen(false);
+    }
+  };
     
   // Add keyboard shortcuts
   useEffect(() => {
@@ -1594,27 +657,21 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
   useEffect(() => {
     const fileInput = fileInputRef.current;
     if (fileInput) {
-      const handleNativeFileChange = async (e: Event) => {
-        const target = e.target as HTMLInputElement;
-        const files = target.files;
-        if (!files) return;
+      const handleNativeFileChange = async (event: Event) => {
+        const fileInput = event.target as HTMLInputElement;
+        const files = fileInput.files;
+        if (!files || files.length === 0) return;
 
         try {
           const newFiles: FileAttachment[] = await Promise.all(
-            Array.from(files).map(async (file) => {
-              const previewUrl = file.type.startsWith('image/') 
-                ? URL.createObjectURL(file)
-                : undefined;
-
-              return {
+            Array.from(files).map(async (file) => ({
                 id: Date.now().toString(),
                 name: file.name,
                 type: file.type,
                 url: URL.createObjectURL(file),
-                previewUrl,
-                size: file.size
-              };
-            })
+              size: file.size,
+              status: 'uploading'
+            }))
           );
 
           setSelectedFiles(prev => [...prev, ...newFiles]);
@@ -1686,13 +743,11 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [isOpen]);
 
-  // Cleanup for object URLs
+  // Update cleanup for object URLs
   useEffect(() => {
     const urls = selectedFiles.map(file => file.url).filter(Boolean);
-    const previewUrls = selectedFiles.map(file => file.previewUrl).filter(Boolean);
-    
     return () => {
-      [...urls, ...previewUrls].forEach(url => {
+      urls.forEach(url => {
         if (url) URL.revokeObjectURL(url);
       });
     };
@@ -1713,559 +768,201 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     };
   }, [isTyping]);
 
-  // Tooltip component
-  const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }) => {
-    const [isVisible, setIsVisible] = useState(false);
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-    
-    const handleMouseEnter = () => {
-      timeoutRef.current = setTimeout(() => {
-        setIsVisible(true);
-      }, 500); // 500ms delay
-    };
-    
-    const handleMouseLeave = () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      setIsVisible(false);
-    };
-    
-    useEffect(() => {
-      return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-      };
+  const handleAttachmentClick = useCallback((attachmentId: string) => {
+    const attachment = selectedFiles.find(f => f.id === attachmentId);
+    if (attachment) {
+      window.open(attachment.url, '_blank');
+    }
+  }, [selectedFiles]);
+
+  const handleRemoveAttachment = useCallback((id: string) => {
+    setSelectedFiles(prev => prev.filter(f => f.id !== id));
     }, []);
     
-    return (
-      <div 
-        className="group relative"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        {children}
-        <div 
-          className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap transition-opacity duration-200 pointer-events-none ${
-            isVisible ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          {text}
-        </div>
-      </div>
+  const handleReaction = (messageId: string, reaction: Reaction) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId 
+          ? { 
+              ...msg, 
+              reactions: msg.reactions ? [...msg.reactions, reaction] : [reaction]
+            }
+          : msg
+      )
     );
   };
 
-  // Loading skeleton component with improved animation
-  const LoadingSkeleton = () => (
-          <motion.div 
-      className="space-y-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-    >
-      <motion.div 
-        className="h-4 bg-gray-200 rounded w-3/4"
-        animate={{ 
-          opacity: [0.5, 0.8, 0.5],
-        }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      />
-              <motion.div 
-        className="h-4 bg-gray-200 rounded w-1/2"
-        animate={{ 
-          opacity: [0.5, 0.8, 0.5],
-        }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 0.2
-        }}
-      />
-      <motion.div 
-        className="h-4 bg-gray-200 rounded w-5/6"
-        animate={{ 
-          opacity: [0.5, 0.8, 0.5],
-        }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 0.4
-        }}
-      />
-              </motion.div>
-  );
-
-  // Update tab change handler with simpler logic
-  const handleTabChange = (tab: 'home' | 'messages' | 'help' | 'news') => {
-    if (activeTab === tab) return;
-    
-    // Set new tab immediately
-    setActiveTab(tab);
-    
-    // Reset states based on tab
-    if (tab === 'messages') {
-      setShowEmojiPicker(false);
-      setShowQuickReplies(false);
-      setShowSavedResponses(false);
-    } else if (tab === 'help') {
-      setSearchQuery('');
-      setSearchResults({ messages: [], articles: [], news: [] });
-    }
+  const handleRemoveReaction = (messageId: string, reactionId: string) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId 
+          ? { 
+              ...msg, 
+              reactions: msg.reactions?.filter(r => r.id !== reactionId)
+            }
+          : msg
+      )
+    );
   };
 
-  // Add function to handle close button click
-  const handleCloseButtonClick = () => {
-    if (activeTab === 'messages') {
-      // Return to home tab instead of closing
-      setActiveTab('home');
+  const handleConversationSelect = (conversationId: string) => {
+    // Find any existing bot conversation
+    const existingBotConversation = recentConversations.find(conv => 
+      conv.messages.some(msg => msg.sender === 'bot') && 
+      !conv.messages.some(msg => msg.sender === 'agent')
+    );
+
+    if (conversationId) {
+      // If a conversation is selected, set it as active
+      setActiveConversation(conversationId);
+      // Load messages for this conversation
+      const conversation = recentConversations.find(c => c.id === conversationId);
+      if (conversation) {
+        // Convert MessageReaction to Reaction type and ensure timestamps are Date objects
+        const convertedMessages = conversation.messages.map(msg => ({
+          ...msg,
+          timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
+          reactions: msg.reactions?.map(reaction => ({
+            id: reaction.emoji,
+            emoji: reaction.emoji,
+            count: reaction.count,
+            users: reaction.users
+          }))
+        }));
+        setMessages(convertedMessages);
+      }
+    } else if (existingBotConversation) {
+      // If there's an existing bot conversation, use that
+      setActiveConversation(existingBotConversation.id);
+      const convertedMessages = existingBotConversation.messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
+        reactions: msg.reactions?.map(reaction => ({
+          id: reaction.emoji,
+          emoji: reaction.emoji,
+          count: reaction.count,
+          users: reaction.users
+        }))
+      }));
+      setMessages(convertedMessages);
     } else {
-      // Close the widget for other tabs
-      setIsOpen(false);
-    }
-  };
-
-  // Update the renderMessagesTab function to show department suggestions
-  const renderMessagesTab = () => (
-    <div className="flex flex-col h-full">
-      {!activeConversation ? (
-        // Conversations List View
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex-shrink-0 relative bg-white text-gray-900 p-5 pb-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Messages</h2>
-              <button
-                onClick={handleCloseButtonClick}
-                className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label="Return to home"
-              >
-                <X size={22} className="text-gray-700" />
-              </button>
-            </div>
-          </div>
-
-          {/* Conversations List */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-5 space-y-3">
-              {conversations.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  onClick={() => setActiveConversation(conversation.id)}
-                  className="w-full bg-white hover:bg-gray-50 p-4 rounded-xl text-left transition-all border border-gray-100 group"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0">
-                      <span className="text-white font-medium text-[15px]">
-                        {conversation.title.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-[15px] text-gray-900">{conversation.title}</h3>
-                        <span className="text-[13px] text-gray-500">{formatTimeAgo(conversation.timestamp)}</span>
-                      </div>
-                      <p className="text-[14px] text-gray-600 line-clamp-2">{conversation.lastMessage}</p>
-                      {conversation.unread && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="w-2 h-2 bg-black rounded-full" />
-                          <span className="text-[13px] text-gray-500">Unread</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* New Chat Button */}
-          <div className="p-5">
-            <button
-              onClick={() => {
-                const newConversation = {
-                  id: Date.now().toString(),
+      // Create a new bot conversation
+      const newConversation: Conversation = {
+        id: crypto.randomUUID(),
                   title: 'New Conversation',
                   lastMessage: '',
                   timestamp: new Date(),
                   unread: false,
-                  messages: []
-                };
-                setConversations(prev => [newConversation, ...prev]);
-                setActiveConversation(newConversation.id);
-                setShowDepartmentSuggestions(true);
-                setBotConversationStep(0);
-                setSelectedCategory(null);
-                setSelectedSubcategory(null);
-                setNeedsHumanSupport(null);
-                
-                const greeting: Message = {
-                  id: Date.now().toString(),
-                  text: "Hi there! 👋 How can I help you today?",
-                  sender: 'agent',
+        messages: [],
+        status: 'active'
+      };
+      
+      // Create welcome message
+      const welcomeMessage: Message = {
+        id: crypto.randomUUID(),
+        text: "Hello! How can I help you today?",
+        sender: 'bot',
                   timestamp: new Date(),
-                  avatar: agentAvatar,
                   status: 'sent'
                 };
                 
-                setMessages([greeting]);
-              }}
-              className="w-full bg-black px-4 py-3 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
-            >
-              <div className="relative z-10 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageCirclePlus size={18} className="text-white" />
-                  <span className="text-[14px] font-medium text-white">Ask a question</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-white" />
-              </div>
-            </button>
-          </div>
-        </div>
-      ) : (
-        // Individual Chat View
-        <div className="flex flex-col h-full">
-          {/* Chat Header */}
-          <div className="flex-shrink-0 relative bg-white text-gray-900 p-5 pb-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setActiveConversation(null)}
-                  className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
-                  aria-label="Back to conversations"
-                >
-                  <ArrowLeft size={22} className="text-gray-700" />
-                </button>
-                <h2 className="text-lg font-medium text-gray-900">
-                  {conversations.find(c => c.id === activeConversation)?.title || 'Chat'}
-                </h2>
-              </div>
-              <button
-                onClick={handleCloseButtonClick}
-                className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label="Close chat"
-              >
-                <X size={22} className="text-gray-700" />
-              </button>
-            </div>
-          </div>
-
-          {/* Messages Area with Improved Scrolling */}
-          <div 
-            ref={messagesContainerRef}
-            className="flex-1 overflow-y-auto p-4 sm:p-5 scrollbar-none"
-            style={{ 
-              scrollBehavior: 'smooth',
-              msOverflowStyle: 'none',
-              scrollbarWidth: 'none',
-              WebkitOverflowScrolling: 'touch'
-            }}
-          >
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex flex-col ${message.sender === 'user' ? 'items-end' : 'items-start'}`}
-                >
-                  <div className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-3 sm:p-4 ${
-                    message.sender === 'user' 
-                      ? 'bg-[#000000] text-white' 
-                      : 'bg-gray-100 text-gray-900'
-                  }`}>
-                    <p className="text-[14px] sm:text-[15px] leading-relaxed">{message.text}</p>
-                  </div>
-                  <div className={`flex items-center gap-1.5 mt-1 ${message.sender === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
-                    <span className="text-[10px] sm:text-[11px] text-gray-500">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {message.sender === 'user' && message.status && (
-                      <span className="text-[10px] sm:text-[11px] text-gray-500 flex items-center">
-                        {message.status === 'read' && (
-                          <CheckCheck size={11} className="text-black" />
-                        )}
-                        {message.status === 'delivered' && (
-                          <Check size={11} />
-                        )}
-                        {message.status === 'sending' && (
-                          <Clock size={11} className="animate-pulse" />
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-              
-              {/* Show typing indicator when isTyping is true */}
-              {isTyping && (
-                <div className="flex flex-col items-start">
-                  <TypingIndicator />
-                </div>
-              )}
-
-              {/* Enhanced Suggestions */}
-              {messages.length > 0 && messages[messages.length - 1].sender === 'agent' && (
-                <div className="mt-4">
-                  {/* Initial Department Selection */}
-                  {showDepartmentSuggestions && !selectedCategory && (
-                    <div className="flex flex-wrap gap-2">
-                      {departments
-                        .filter(dept => !messages.some(msg => 
-                          msg.text.toLowerCase().includes(dept.name.toLowerCase())
-                        ))
-                        .map((dept) => (
-                          <button
-                            key={dept.id}
-                            onClick={() => handleDepartmentSelect(dept.id)}
-                            className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
-                          >
-                            <div className="flex items-center gap-2 relative z-10">
-                              <span className="text-[15px] text-white">
-                                {dept.id === 'billing' && '💳'}
-                                {dept.id === 'technical' && '🔧'}
-                                {dept.id === 'account' && '👤'}
-                                {dept.id === 'general' && '💬'}
-                                {dept.id === 'sales' && '💼'}
-                                {dept.id === 'product' && '💡'}
-                              </span>
-                              <span className="text-[13px] font-medium text-white">{dept.name}</span>
-                            </div>
-                          </button>
-                      ))}
-                      <button
-                        onClick={() => {
-                          setShowDepartmentSuggestions(false);
-                          setNeedsHumanSupport(true);
-                          setBotConversationStep(3);
-                          const newMessage: Message = {
-                            id: Date.now().toString(),
-                            text: "I'd like to chat with a human representative",
-                            sender: 'user',
-                            timestamp: new Date(),
-                            status: 'sending',
-                          };
-                          setMessages(prev => [...prev, newMessage]);
-                          
-                          // Simulate agent response
-                          setIsTyping(true);
-                          setTimeout(() => {
-                            setIsTyping(false);
-                            const response: Message = {
-                              id: (Date.now() + 1).toString(),
-                              text: "I'm connecting you with a human representative. How can we help you today?",
-                              sender: 'agent',
-                              timestamp: new Date(),
-                              avatar: agentAvatar,
-                              status: 'sent'
-                            };
-                            setMessages(prev => [...prev, response]);
-                          }, 1000);
-                        }}
-                        className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
-                      >
-                        <div className="flex items-center gap-2 relative z-10">
-                          <span className="text-[15px] text-white">🤝</span>
-                          <span className="text-[13px] font-medium text-white">Chat with a human</span>
-                        </div>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Subcategory Selection */}
-                  {selectedCategory && !selectedSubcategory && !needsHumanSupport && (
-                    <div className="flex flex-wrap gap-2">
-                      {subcategories[selectedCategory as keyof typeof subcategories]
-                        .filter(sub => !messages.some(msg => 
-                          msg.text.toLowerCase().includes(sub.name.toLowerCase())
-                        ))
-                        .map((sub) => (
-                          <button
-                            key={sub.id}
-                            onClick={() => handleSubcategorySelect(sub.id)}
-                            className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
-                          >
-                            <div className="flex items-center gap-2 relative z-10">
-                              <span className="text-[15px] text-white">
-                                {sub.id.includes('payment') && '💰'}
-                                {sub.id.includes('subscription') && '📅'}
-                                {sub.id.includes('refund') && '↩️'}
-                                {sub.id.includes('invoice') && '📄'}
-                                {sub.id.includes('setup') && '⚙️'}
-                                {sub.id.includes('error') && '⚠️'}
-                                {sub.id.includes('access') && '🔑'}
-                                {sub.id.includes('login') && '🔒'}
-                                {!sub.id.match(/(payment|subscription|refund|invoice|setup|error|access|login)/) && '📝'}
-                              </span>
-                              <span className="text-[13px] font-medium text-white">{sub.name}</span>
-                            </div>
-                          </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Final Actions */}
-                  {selectedSubcategory && !needsHumanSupport && (
-                    <div className="flex flex-wrap gap-2">
-                      {!messages.some(msg => msg.text.toLowerCase().includes('chat with agent')) && (
-                        <button
-                          onClick={() => handleHumanSupportSelect(true)}
-                          className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
-                        >
-                          <div className="flex items-center gap-2 relative z-10">
-                            <span className="text-[15px] text-white">👥</span>
-                            <span className="text-[13px] font-medium text-white">Chat with an agent</span>
-                          </div>
-                        </button>
-                      )}
-                      {!messages.some(msg => msg.text.toLowerCase().includes('view help guide')) && (
-                        <button
-                          onClick={() => handleSuggestionClick({ id: 'self_help', text: 'View help guide' })}
-                          className="bg-black px-3 py-2 rounded-2xl text-left border border-gray-800 group relative overflow-hidden"
-                        >
-                          <div className="flex items-center gap-2 relative z-10">
-                            <span className="text-[15px] text-white">📚</span>
-                            <span className="text-[13px] font-medium text-white">View help guide</span>
-                          </div>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Input Area - Only show if human support is selected */}
-          {needsHumanSupport === true && (
-            <div className="flex-shrink-0 p-3 sm:p-4 border-t border-transparent">
-              <div className="relative">
-                <textarea
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Type your message..."
-                  rows={1}
-                  className="w-full bg-[#F8F9FB] rounded-[30px] py-3 sm:py-3.5 pl-4 pr-[120px] outline-none text-[14px] sm:text-[15px] placeholder-gray-400 text-gray-900 resize-none max-h-[150px] min-h-[52px] transition-all duration-200"
-                  style={{
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: '#CBD5E1 transparent',
-                    overflowY: inputText ? 'auto' : 'hidden'
-                  }}
-                />
-                <div className="absolute right-[0.48rem] top-[45%] -translate-y-1/2 flex items-center justify-center gap-1">
-                  {!inputText.trim() ? (
-                    <>
-                      <button 
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <Smile size={20} />
-                      </button>
-                      <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <Paperclip size={20} />
-                      </button>
-                      <button 
-                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <Image size={20} />
-                      </button>
-                    </>
-                  ) : (
-                    <button 
-                      onClick={handleSendMessage}
-                      className="p-2 text-white hover:text-white/90 transition-colors bg-black rounded-full hover:bg-black/90 flex items-center justify-center w-10 h-10"
-                      style={{ marginTop: '1px' }}
-                    >
-                      <ArrowUp size={20} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
-  // Add quick suggestions data
-  const quickSuggestions = [
-    { id: 'order_status', text: 'Order status' },
-    { id: 'cancel_order', text: 'Cancel order' },
-    { id: 'return_request', text: 'Return request' },
-    { id: 'refund_status', text: 'Refund status' },
-    { id: 'shipping_info', text: 'Shipping info' },
-    { id: 'payment_issue', text: 'Payment issue' }
-  ];
-
-  // Update the handleSuggestionClick function
-  const handleSuggestionClick = (suggestion: { id: string; text: string }) => {
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: suggestion.text,
-      sender: 'user',
-      timestamp: new Date(),
-      status: 'sending',
-    };
-    
-    setMessages(prev => [...prev, newMessage]);
-    
-    // Update message status after sending
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === newMessage.id 
-          ? { ...msg, status: 'delivered' } 
-          : msg
-      ));
-    }, 1000);
-    
-    // Simulate agent typing and response
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const response: Message = {
-        id: (Date.now() + 1).toString(),
-        text: `I'll help you with your ${suggestion.text.toLowerCase()}. How would you like to proceed?`,
-        sender: 'agent',
-        timestamp: new Date(),
-        avatar: agentAvatar,
-        status: 'sent'
-      };
-      setMessages(prev => [...prev, response]);
-      setLastReadTimestamp(new Date());
+      // Add the welcome message to the conversation
+      newConversation.messages = [welcomeMessage];
       
-      setBotConversationStep(2);
+      // Add the new conversation to the store
+      useChatStore.getState().addConversation(newConversation);
       
-      // Update original message status to read
-      setTimeout(() => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id 
-            ? { ...msg, status: 'read' } 
-            : msg
-        ));
-      }, 1000);
-    }, 2000);
+      // Set it as active and initialize with the welcome message
+      setActiveConversation(newConversation.id);
+      setMessages([welcomeMessage]);
+    }
+    
+    // Always open the chat widget and switch to messages tab
+    setIsOpen(true);
+    setActiveTab('messages');
   };
 
+  const renderMessagesTab = () => (
+    <MessagesTab
+      messages={messages}
+      isTyping={isTyping}
+      onSendMessage={handleSendMessage}
+      onFileUpload={handleFileUpload}
+      onReaction={handleReaction}
+      onAttachmentClick={handleAttachmentClick}
+      onRemoveAttachment={handleRemoveAttachment}
+      onRemoveReaction={handleRemoveReaction}
+      quickReplies={quickReplies}
+      savedResponses={savedResponses}
+      recentConversations={recentConversations
+        .map(conv => ({
+          ...conv,
+          timestamp: new Date(conv.timestamp),
+          messages: conv.messages.map(msg => ({
+            ...msg,
+            reactions: msg.reactions?.map(reaction => ({
+              id: reaction.emoji,
+              emoji: reaction.emoji,
+              count: reaction.count,
+              users: reaction.users
+            }))
+          }))
+        }))
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())}
+      onConversationSelect={handleConversationSelect}
+      onClose={handleCloseButtonClick}
+    />
+  );
+
+  const renderHelpTab = () => (
+    <HelpTab
+      searchQuery={searchQuery}
+      onSearch={handleSearch}
+      isSearching={isSearching}
+      helpArticles={helpArticles}
+      onArticleClick={handleArticleClick}
+      activeArticle={activeArticle}
+      searchResults={searchResults.articles}
+    />
+  );
+
+  const renderNewsTab = () => (
+    <NewsTab
+      searchQuery={searchQuery}
+      onSearch={handleSearch}
+      isSearching={isSearching}
+      newsItems={newsItems}
+      onNewsClick={handleNewsClick}
+      activeNewsItem={activeNewsItem}
+      searchResults={searchResults.news}
+    />
+  );
+
+  const renderHomeTab = () => (
+    <HomeTab
+      isLoading={isHomeLoading}
+      searchQuery={searchQuery}
+      onSearch={handleSearch}
+      onTabChange={setActiveTab}
+      recentConversations={(recentConversations || []).map(conv => ({
+        id: conv.id,
+        title: conv.title || 'New Conversation',
+        preview: conv.lastMessage || 'No messages yet',
+        timestamp: conv.timestamp || new Date(),
+        unread: conv.unread || false
+      }))}
+      helpArticles={helpArticles}
+      newsItems={newsItems}
+      onArticleClick={handleArticleClick}
+      onNewsClick={handleNewsClick}
+      onConversationSelect={handleConversationSelect}
+    />
+  );
+
   return (
-    <div style={getPositionStyles()} className="font-sans">
-      {/* Launcher Button */}
-      <Tooltip text="Press ⌘K to open chat">
+    <div className={`fixed ${position} z-50`} style={{ margin: offset }}>
+      {/* Trigger Button */}
+      <Tooltip text={isOpen ? 'Close chat' : 'Open chat'}>
         <motion.button
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center justify-center w-[60px] h-[60px] bg-[#000000] text-white rounded-full shadow-lg hover:shadow-xl transition-all relative z-50"
@@ -2280,10 +977,11 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
           }}
           aria-label="Open chat"
           style={{
-            position: 'absolute',
+            position: 'fixed',
             right: position === 'bottom-right' ? offset : 'auto',
             left: position === 'bottom-left' ? offset : 'auto',
-            bottom: offset
+            bottom: offset,
+            zIndex: 50
           }}
         >
           {isOpen ? (
@@ -2299,10 +997,20 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
         </motion.button>
       </Tooltip>
 
+      {/* File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileInputChange}
+        className="hidden"
+        accept="image/*,application/pdf"
+      />
+
       {/* Chat Window */}
       <AnimatePresence mode="wait">
         {isOpen && (
           <motion.div
+            key="chat-window"
             initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -2312,18 +1020,22 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
               damping: 25,
               mass: 0.8
             }}
-            className="absolute bottom-[76px] right-0 w-full max-w-[400px] h-[700px] bg-white rounded-[16px] shadow-2xl flex flex-col sm:max-w-[400px] md:max-w-[400px] xs:bottom-0 xs:right-0 xs:w-full xs:h-[100vh] xs:rounded-none xs:max-h-[100vh]"
+            className="fixed bottom-[76px] right-0 w-full max-w-[400px] h-[700px] bg-white rounded-[16px] shadow-2xl flex flex-col sm:max-w-[400px] md:max-w-[400px] xs:bottom-0 xs:right-0 xs:w-full xs:h-[100vh] xs:rounded-none xs:max-h-[100vh] overflow-hidden"
             style={{ 
               overflow: 'hidden',
               marginBottom: '16px',
               willChange: 'transform, opacity',
               backfaceVisibility: 'hidden',
-              transform: 'translateZ(0)'
+              transform: 'translateZ(0)',
+              right: position === 'bottom-right' ? offset : 'auto',
+              left: position === 'bottom-left' ? offset : 'auto',
+              zIndex: 50,
+              borderRadius: '16px'
             }}
           >
             {/* Pull to refresh indicator */}
             {isRefreshing && (
-              <div className="absolute top-0 left-0 right-0 h-1 bg-black">
+              <div key="refresh-indicator" className="absolute top-0 left-0 right-0 h-1 bg-black">
                 <div className="h-full bg-gray-800 animate-pulse"></div>
                   </div>
                 )}
@@ -2331,15 +1043,16 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Simplified tab content rendering without AnimatePresence */}
-              {activeTab === 'messages' && renderMessagesTab()}
-              {activeTab === 'help' && renderHelpTab()}
-              {activeTab === 'news' && renderNewsTab()}
-              {activeTab === 'home' && renderHomeTab()}
+              {activeTab === 'messages' && <div key="messages-tab">{renderMessagesTab()}</div>}
+              {activeTab === 'help' && <div key="help-tab">{renderHelpTab()}</div>}
+              {activeTab === 'news' && <div key="news-tab">{renderNewsTab()}</div>}
+              {activeTab === 'home' && <div key="home-tab">{renderHomeTab()}</div>}
             </div>
 
             {/* Bottom Navigation - Only show when not in messages tab */}
             {activeTab !== 'messages' && (
               <motion.div 
+                key="bottom-nav"
                 className="border-t border-gray-200 w-[400px] h-[81px] flex-shrink-0"
                 initial={{ y: 5, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -2374,6 +1087,53 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Add bot flow UI */}
+      {activeTab === 'messages' && botStep === 0 && !selectedDepartment && (
+        <div key="bot-flow-0" className="p-4 space-y-4">
+          <div className="text-center text-gray-600 mb-4">
+            {botSteps[0].message}
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {botSteps[0].options.map(option => (
+              <button
+                key={option.id}
+                onClick={() => handleDepartmentSelect(option.id)}
+                className="flex items-start p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 transition-all group text-left"
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">{option.text}</div>
+                  <div className="text-sm text-gray-500 mt-1">{option.description}</div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 group-hover:translate-x-1 transition-all" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'messages' && botStep === 1 && selectedDepartment && !needsHumanSupport && (
+        <div key="bot-flow-1" className="p-4 space-y-4">
+          <div className="text-center text-gray-600 mb-4">
+            {botSteps[1].message}
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {botSteps[1].options.map(option => (
+              <button
+                key={option.id}
+                onClick={() => handleSupportTypeSelect(option.id as 'continue_bot' | 'human_agent')}
+                className="flex items-start p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 transition-all group text-left"
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">{option.text}</div>
+                  <div className="text-sm text-gray-500 mt-1">{option.description}</div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 group-hover:translate-x-1 transition-all" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

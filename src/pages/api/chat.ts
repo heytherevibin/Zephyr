@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import errorService from '../../services/error-service';
 
 // Define types for our data structures
 interface KnowledgeArticle {
@@ -70,7 +71,7 @@ const analyticsEvents: AnalyticsEvent[] = [];
 // In-memory conversation storage for demo
 const conversations: Record<string, ChatMessage[]> = {};
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Handle OPTIONS requests for CORS
     if (req.method === 'OPTIONS') {
@@ -99,11 +100,19 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         return handleChat(req, res);
     }
   } catch (error) {
-    console.error('API Error:', error);
-    return res.status(500).json({ 
-      success: false, 
+    console.error('Error in chat API:', error);
+    
+    // Log the error using the error service
+    errorService.handleApiError({
+      response: {
+        status: 500,
+        data: error instanceof Error ? error.message : 'Internal server error'
+      }
+    });
+
+    res.status(500).json({ 
       error: 'Internal server error',
-      message: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
+      message: error instanceof Error ? error.message : 'An unexpected error occurred'
     });
   }
 }

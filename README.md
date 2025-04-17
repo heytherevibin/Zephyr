@@ -1,18 +1,72 @@
 # Zephyr Chat Widget
 
-A professional chat widget for websites with multi-department routing, customer satisfaction surveys, analytics tracking, and more.
+A modern, customizable chat widget for Next.js applications with enterprise features.
+
+## Project Structure
+
+```
+zephyr/
+├── src/                      # Source code
+│   ├── components/           # React components
+│   │   ├── chat/             # Chat-specific components
+│   │   │   ├── constants/    # Chat constants and configurations
+│   │   │   ├── hooks/        # Chat-specific React hooks
+│   │   │   ├── messages/     # Message-related components
+│   │   │   ├── styles/       # Chat-specific styles
+│   │   │   ├── tabs/         # Tab components
+│   │   │   ├── types.ts      # Chat component types
+│   │   │   └── utils/        # Chat-specific utilities
+│   │   ├── admin/            # Admin dashboard components
+│   │   ├── dashboard/        # User dashboard components
+│   │   ├── shared/           # Shared UI components
+│   │   ├── ChatWidget.tsx    # Main chat widget component
+│   │   └── FeatureToggle.tsx # Feature flag component
+│   ├── pages/                # Next.js pages
+│   ├── services/             # API and external service integrations
+│   ├── store/                # State management
+│   │   └── chatStore.ts      # Chat state management
+│   ├── styles/               # Global styles
+│   ├── types/                # TypeScript type definitions
+│   │   ├── enterprise/       # Enterprise feature types
+│   │   │   ├── common.ts     # Shared enterprise types
+│   │   │   ├── features.ts   # Feature flag types
+│   │   │   ├── index.ts      # Enterprise type exports
+│   │   │   ├── integrations.ts # Integration types
+│   │   │   ├── monitoring.ts # Monitoring types
+│   │   │   ├── performance.ts # Performance types
+│   │   │   └── security.ts   # Security types
+│   │   ├── chat.ts           # Chat-related types
+│   │   └── index.ts          # Type exports
+│   ├── utils/                # Utility functions
+│   └── lib/                  # Third-party library integrations
+├── public/                   # Static assets
+├── tests/                    # Test files
+├── docs/                     # Documentation
+├── config/                   # Configuration files
+├── .next/                    # Next.js build output
+├── node_modules/             # Dependencies
+├── next.config.js            # Next.js configuration
+├── tailwind.config.js        # Tailwind CSS configuration
+├── postcss.config.js         # PostCSS configuration
+├── tsconfig.json             # TypeScript configuration
+├── package.json              # Project metadata and dependencies
+└── README.md                 # Project documentation
+```
 
 ## Features
 
-- Multi-department routing
-- Customer satisfaction surveys
-- Analytics tracking
-- Canned responses
-- Multilingual support
+- Modern, responsive chat interface
+- Real-time messaging
 - File attachments
-- Emoji support
-- Dark mode
-- Mobile responsive
+- Typing indicators
+- Message reactions
+- Threaded conversations
+- Enterprise features:
+  - Role-based access control
+  - Advanced security
+  - Performance optimizations
+  - Monitoring and analytics
+  - Integration capabilities
 
 ## Getting Started
 
@@ -23,127 +77,67 @@ A professional chat widget for websites with multi-department routing, customer 
 
 ### Installation
 
-1. Clone the repository
 ```bash
-git clone https://github.com/heytherevibin/Zephyr.git
-cd Zephyr
-```
+# Clone the repository
+git clone https://github.com/yourusername/zephyr.git
 
-2. Install dependencies
-```bash
+# Navigate to the project directory
+cd zephyr
+
+# Install dependencies
 npm install
 # or
 yarn install
 ```
 
-3. Run the development server
+### Development
+
 ```bash
+# Start the development server
 npm run dev
 # or
 yarn dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+### Building for Production
+
+```bash
+# Build the project
+npm run build
+# or
+yarn build
+
+# Start the production server
+npm run start
+# or
+yarn start
+```
 
 ## Usage
 
-### Basic Implementation
-
-```jsx
-import ChatWidget from './components/ChatWidget';
+```tsx
+import { ChatWidget } from 'zephyr';
 
 function App() {
   return (
     <ChatWidget
       position="bottom-right"
-      offset={20}
-      triggerButtonSize={60}
-      headerText="Support"
-      primaryColor="#0066FF"
-      textColor="#FFFFFF"
-      showNotificationBadge={true}
-      notificationCount={0}
-      bubbleAnimation={true}
-      mobileFullScreen={true}
-      soundEnabled={true}
-      darkMode={false}
+      primaryColor="#4F46E5"
+      companyName="Your Company"
+      agentName="Support Agent"
     />
   );
 }
 ```
 
-### Advanced Implementation with All Features
+## Contributing
 
-```jsx
-import ChatWidget from './components/ChatWidget';
-
-function App() {
-  return (
-    <ChatWidget
-      position="bottom-right"
-      offset={20}
-      triggerButtonSize={60}
-      headerText="Zephyr Support"
-      primaryColor="#0066FF"
-      textColor="#FFFFFF"
-      showNotificationBadge={true}
-      notificationCount={0}
-      bubbleAnimation={true}
-      mobileFullScreen={true}
-      soundEnabled={true}
-      darkMode={false}
-      // Professional features
-      enableDepartmentRouting={true}
-      enableAnalytics={true}
-      enableCannedResponses={true}
-      enableMultilingualSupport={true}
-      userIdentity={{ id: 'user-12345', name: 'John Doe', email: 'john@example.com' }}
-      apiEndpoint="/api/chat"
-      onMessageSend={(msg) => console.log("Message sent:", msg)}
-      showSatisfactionSurvey={true}
-    />
-  );
-}
-```
-
-## Configuration Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| position | string | 'bottom-right' | Position of the chat widget ('bottom-right', 'bottom-left') |
-| offset | number | 20 | Offset from the edge of the screen in pixels |
-| triggerButtonSize | number | 60 | Size of the trigger button in pixels |
-| headerText | string | 'Chat' | Text displayed in the chat header |
-| primaryColor | string | '#0066FF' | Primary color for the chat widget |
-| textColor | string | '#FFFFFF' | Text color for the chat widget |
-| showNotificationBadge | boolean | false | Whether to show the notification badge |
-| notificationCount | number | 0 | Number of unread notifications |
-| bubbleAnimation | boolean | true | Whether to animate the chat bubble |
-| mobileFullScreen | boolean | true | Whether to use full screen on mobile devices |
-| soundEnabled | boolean | true | Whether to enable notification sounds |
-| darkMode | boolean | false | Whether to use dark mode |
-| enableDepartmentRouting | boolean | false | Whether to enable department routing |
-| enableAnalytics | boolean | false | Whether to enable analytics tracking |
-| enableCannedResponses | boolean | false | Whether to enable canned responses |
-| enableMultilingualSupport | boolean | false | Whether to enable multilingual support |
-| userIdentity | object | null | User identity information |
-| apiEndpoint | string | '/api/chat' | API endpoint for chat messages |
-| onMessageSend | function | null | Callback function when a message is sent |
-| showSatisfactionSurvey | boolean | false | Whether to show the satisfaction survey |
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [Next.js](https://nextjs.org/)
-- [React](https://reactjs.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Framer Motion](https://www.framer.com/motion/)
-- [Lucide Icons](https://lucide.dev/)
-- [Emoji Mart](https://github.com/missive/emoji-mart)
-- [Date-fns](https://date-fns.org/)
-- [GSAP](https://greensock.com/gsap/)
-- [jsPDF](https://github.com/parallax/jsPDF)
-- [Socket.io](https://socket.io/)

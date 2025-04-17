@@ -3,6 +3,8 @@
  * Handles API requests with authentication and error handling
  */
 
+import errorService from '../services/error-service';
+
 // Define types for API responses and requests
 interface ApiResponse<T = any> {
   success: boolean;
@@ -82,6 +84,15 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
     const error = new Error(errorData.message || 'Something went wrong') as ApiError;
     error.statusCode = response.status;
     error.details = errorData;
+
+    // Log the error using the error service
+    errorService.handleApiError({
+      response: {
+        status: response.status,
+        data: errorData
+      }
+    });
+
     throw error;
   }
 

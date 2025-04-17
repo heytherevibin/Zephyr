@@ -1,39 +1,113 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import ChatWidget from '../src/components/ChatWidget';
+import ChatWidget from '../components/ChatWidget';
 import { MessageSquare, Users, BarChart2, Github, ArrowRight, CheckCircle2, Zap, Shield, Globe, Bell, Settings, Code } from 'lucide-react';
+import { cn } from '../utils/cn';
+import { motion } from 'framer-motion';
+import { FeatureToggle } from '../components/FeatureToggle';
 
-interface FeatureToggleProps {
-  label: string;
-  isEnabled: boolean;
-  onChange: () => void;
+interface AnimatedElement {
+  width: number;
+  height: number;
+  left: number;
+  top: number;
+  animationDuration: number;
+  animationDelay: number;
 }
+
+const features = [
+  {
+    icon: <MessageSquare className="w-6 h-6" />,
+    title: "Smart Routing",
+    description: "Automatically route conversations to the right department based on context and expertise.",
+    color: "text-blue-400 group-hover:text-blue-300",
+    bgColor: "bg-blue-400/10 group-hover:bg-blue-400/20",
+    borderColor: "group-hover:border-blue-400/50"
+  },
+  {
+    icon: <Zap className="w-6 h-6" />,
+    title: "AI-Powered Responses",
+    description: "Leverage AI to provide instant, accurate responses to common customer queries.",
+    color: "text-indigo-400 group-hover:text-indigo-300",
+    bgColor: "bg-indigo-400/10 group-hover:bg-indigo-400/20",
+    borderColor: "group-hover:border-indigo-400/50"
+  },
+  {
+    icon: <BarChart2 className="w-6 h-6" />,
+    title: "Real-time Analytics",
+    description: "Track performance metrics and gain insights to improve your support operations.",
+    color: "text-emerald-400 group-hover:text-emerald-300",
+    bgColor: "bg-emerald-400/10 group-hover:bg-emerald-400/20",
+    borderColor: "group-hover:border-emerald-400/50"
+  },
+  {
+    icon: <Globe className="w-6 h-6" />,
+    title: "Multilingual Support",
+    description: "Serve customers in their preferred language with automatic translation.",
+    color: "text-purple-400 group-hover:text-purple-300",
+    bgColor: "bg-purple-400/10 group-hover:bg-purple-400/20",
+    borderColor: "group-hover:border-purple-400/50"
+  },
+  {
+    icon: <Shield className="w-6 h-6" />,
+    title: "Enterprise Security",
+    description: "Bank-grade encryption and compliance with industry standards.",
+    color: "text-rose-400 group-hover:text-rose-300",
+    bgColor: "bg-rose-400/10 group-hover:bg-rose-400/20",
+    borderColor: "group-hover:border-rose-400/50"
+  },
+  {
+    icon: <Settings className="w-6 h-6" />,
+    title: "Easy Integration",
+    description: "Seamlessly integrate with your existing tools and workflows.",
+    color: "text-amber-400 group-hover:text-amber-300",
+    bgColor: "bg-amber-400/10 group-hover:bg-amber-400/20",
+    borderColor: "group-hover:border-amber-400/50"
+  }
+];
+
+const GridBackground = () => (
+  <div className="fixed inset-0 overflow-hidden pointer-events-none">
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.8),rgba(17,24,39,1))]"></div>
+    <div className="absolute inset-0">
+      <div className="h-full w-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px]"></div>
+    </div>
+    <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
+  </div>
+);
 
 export default function Home() {
   const [widgetConfig, setWidgetConfig] = useState({
-    // Enable all professional features
     enableDepartmentRouting: true,
     enableAnalytics: true,
     enableCannedResponses: true,
     showSatisfactionSurvey: false,
     enableMultilingualSupport: true,
-    // Mock API endpoint for demo purposes
     apiEndpoint: '/api/chat',
-    // User identity
     userIdentity: { id: 'user-12345', name: 'Demo User', email: 'demo@example.com' }
   });
 
-  // Add state to control sound
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [scrollPosition, setScrollPosition] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  const [animatedElements, setAnimatedElements] = useState<AnimatedElement[]>([]);
 
-  // Handle window size
   useEffect(() => {
-    // Update window size
+    setIsVisible(true);
+    
+    const elements = Array(20).fill(null).map(() => ({
+      width: Math.random() * 300 + 50,
+      height: Math.random() * 300 + 50,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      animationDuration: Math.random() * 10 + 5,
+      animationDelay: Math.random() * 5
+    }));
+    setAnimatedElements(elements);
+
     const handleResize = () => {
       setWindowSize({
         width: window.innerWidth,
@@ -41,65 +115,31 @@ export default function Home() {
       });
     };
 
-    // Set initial size
-    handleResize();
-
-    // Add event listener
-    window.addEventListener('resize', handleResize);
-
-    // Cleanup
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Handle mouse movement for parallax effects
-  useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
     };
-    
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
   }, []);
 
-  // Handle scroll position for animations
   useEffect(() => {
     const handleScroll = () => {
       setScrollPosition(window.scrollY);
     };
-    
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Trigger entrance animations
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden">
-      {/* Animated background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.8),rgba(17,24,39,1))]"></div>
-        <div className="absolute w-full h-full">
-          {[...Array(20)].map((_, i) => (
-            <div 
-              key={i} 
-              className="absolute rounded-full bg-blue-500/10 blur-xl animate-pulse"
-              style={{
-                width: `${Math.random() * 300 + 50}px`,
-                height: `${Math.random() * 300 + 50}px`,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDuration: `${Math.random() * 10 + 5}s`,
-                animationDelay: `${Math.random() * 5}s`,
-                transform: windowSize.width ? `translate(${(mousePosition.x - windowSize.width / 2) * 0.02}px, ${(mousePosition.y - windowSize.height / 2) * 0.02}px)` : 'none'
-              }}
-            ></div>
-          ))}
-        </div>
-        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden relative">
+      <GridBackground />
 
       <Head>
         <title>Zephyr Chat | Enterprise-Grade Chat Solution</title>
@@ -154,27 +194,20 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {[
-              { icon: <MessageSquare className="w-6 h-6 text-blue-400" />, title: "Smart Routing", description: "Automatically route conversations to the right department based on context and expertise.", color: "blue" },
-              { icon: <Zap className="w-6 h-6 text-indigo-400" />, title: "AI-Powered Responses", description: "Leverage AI to provide instant, accurate responses to common customer queries.", color: "indigo" },
-              { icon: <BarChart2 className="w-6 h-6 text-green-400" />, title: "Real-time Analytics", description: "Track performance metrics and gain insights to improve your support operations.", color: "green" },
-              { icon: <Globe className="w-6 h-6 text-purple-400" />, title: "Multilingual Support", description: "Serve customers in their preferred language with automatic translation.", color: "purple" },
-              { icon: <Shield className="w-6 h-6 text-red-400" />, title: "Enterprise Security", description: "Bank-grade encryption and compliance with industry standards.", color: "red" },
-              { icon: <Settings className="w-6 h-6 text-yellow-400" />, title: "Easy Integration", description: "Seamlessly integrate with your existing tools and workflows.", color: "yellow" }
-            ].map((feature, index) => (
+            {features.map((feature, index) => (
               <div 
                 key={index}
-                className={`group bg-gray-800/50 backdrop-blur-sm p-8 rounded-xl border border-gray-700 hover:border-${feature.color}-500/50 transition-all duration-500 hover:shadow-lg hover:shadow-${feature.color}-500/20 transform hover:-translate-y-1`}
+                className="group feature-card"
                 style={{ 
                   transitionDelay: `${index * 100}ms`,
                   opacity: isVisible ? 1 : 0,
                   transform: isVisible ? 'translateY(0)' : 'translateY(20px)'
                 }}
               >
-                <div className={`w-14 h-14 bg-${feature.color}-500/10 rounded-lg flex items-center justify-center mb-6 group-hover:bg-${feature.color}-500/20 transition-colors duration-300`}>
+                <div className={`feature-icon ${feature.bgColor}`}>
                   {feature.icon}
                 </div>
-                <h3 className={`text-xl font-semibold mb-3 text-${feature.color}-400`}>{feature.title}</h3>
+                <h3 className={`text-xl font-semibold mb-3 ${feature.color}`}>{feature.title}</h3>
                 <p className="text-gray-300">{feature.description}</p>
               </div>
             ))}
@@ -391,53 +424,25 @@ export default function Home() {
       <ChatWidget
         position="bottom-right"
         offset={20}
-        triggerButtonSize={60}
         headerText="Support Team"
         primaryColor="#3B82F6"
         textColor="#ffffff"
         showNotificationBadge={true}
         notificationCount={0}
         bubbleAnimation={true}
-        mobileFullScreen={false}
+        mobileFullScreen={true}
         soundEnabled={soundEnabled}
         darkMode={true}
         enableDepartmentRouting={widgetConfig.enableDepartmentRouting}
         enableAnalytics={widgetConfig.enableAnalytics}
         enableCannedResponses={widgetConfig.enableCannedResponses}
         enableMultilingualSupport={widgetConfig.enableMultilingualSupport}
-        companyName="Support Team"
-        agentName="Sarah"
-        agentAvatar=""
-        onMessageSend={(message) => console.log('Message sent:', message)}
-        onFileUpload={(file) => console.log('File uploaded:', file)}
+        userIdentity={widgetConfig.userIdentity}
+        apiEndpoint={widgetConfig.apiEndpoint}
         enableTypingPreview={true}
-        quickReplies={[
-          { id: '1', text: 'How do I get started?', category: 'general' },
-          { id: '2', text: 'What are your pricing plans?', category: 'pricing' },
-          { id: '3', text: 'Can I customize the widget?', category: 'customization' }
-        ]}
-        savedResponses={[
-          { id: '1', title: 'Greeting', content: 'Thank you for your message. How can I help you today?', tags: ['greeting', 'welcome'] },
-          { id: '2', title: 'Support', content: 'I understand your concern. Let me help you with that.', tags: ['support', 'acknowledgment'] }
-        ]}
-        onArticleView={(articleId) => console.log('Article viewed:', articleId)}
-        onNewsRead={(newsId) => console.log('News read:', newsId)}
-        helpArticles={[
-          { 
-            id: '1', 
-            title: 'Getting Started Guide', 
-            content: 'Learn how to set up your chat widget...',
-            category: 'onboarding',
-            views: 0
-          },
-          { 
-            id: '2', 
-            title: 'Customization Options', 
-            content: 'Explore all available customization options...',
-            category: 'customization',
-            views: 0
-          }
-        ]}
+        quickReplies={[]}
+        savedResponses={[]}
+        helpArticles={[]}
         newsItems={[
           { 
             id: '2', 
@@ -445,10 +450,11 @@ export default function Home() {
             content: 'Scheduled maintenance notice...',
             date: new Date(),
             category: 'maintenance',
-            read: false
+            image: '/maintenance.svg',
+            link: '/news/maintenance'
           }
         ]}
-        showSatisfactionSurvey={true}
+        showSatisfactionSurvey={widgetConfig.showSatisfactionSurvey}
       />
 
       {/* Custom styles for animations and effects */}
@@ -494,29 +500,3 @@ export default function Home() {
     </div>
   );
 }
-
-// Feature Toggle Component
-const FeatureToggle: React.FC<FeatureToggleProps> = ({ label, isEnabled, onChange }) => {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm font-medium text-gray-300">{label}</span>
-      <button
-        onClick={onChange}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${
-          isEnabled ? 'bg-blue-500' : 'bg-gray-700'
-        }`}
-        aria-pressed={isEnabled}
-        aria-label={`${label} ${isEnabled ? 'enabled' : 'disabled'}`}
-      >
-        <span
-          className={`${
-            isEnabled ? 'translate-x-6' : 'translate-x-1'
-          } inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-md`}
-        />
-        {isEnabled && (
-          <span className="absolute inset-0 rounded-full bg-blue-500/30 blur-md"></span>
-        )}
-      </button>
-    </div>
-  );
-};

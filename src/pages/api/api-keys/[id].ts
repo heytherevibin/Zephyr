@@ -24,6 +24,9 @@ const authenticate = (req: NextApiRequest, res: NextApiResponse): AuthResult => 
   return { authenticated: true, role: 'admin' };
 };
 
+// This is an API route, not a page, so we don't need getStaticPaths
+// API routes are handled differently from pages in Next.js
+
 export default function handler(req: NextApiRequest, res: NextApiResponse): void {
   // Check authentication
   const user = authenticate(req, res);
